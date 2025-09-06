@@ -1,2 +1,1 @@
-\i ./db/schema.sql
-\i ./db/seed.sql
+\i ./db/university_large.sql
