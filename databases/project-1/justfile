@@ -5,3 +5,14 @@ set quiet := true
 
 default:
     just --list
+
+step01_setup:
+    echo "Setup..."
+
+step02_build:
+    echo "Build..."
+
+step03_test:
+    echo "Test..."
+
+step00_simulation: step01_setup step02_build step03_test
