@@ -1,6 +1,3 @@
-# Default: use pwsh (PowerShell 7+) for most recipes
-set shell := ["pwsh.exe", "-NoLogo", "-Command"]
-
 # We can also use @ to selectively silent
 hello:
   Write-Output "Hello, world!"
