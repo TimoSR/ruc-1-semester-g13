@@ -1,0 +1,7 @@
+import "./commands/justfile"
+import "./commands/test2/justfile"
+# So we don't print the command
+set quiet := true 
+
+default:
+    just --list

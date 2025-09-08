@@ -1,7 +1,7 @@
 # Requires PowerShell 5.0+
 # Set the working directory to the location of the script
-$PSScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-Set-Location $PSScriptRoot
+# Safe alternative
+Set-Location -Path $PSScriptRoot
 
 Write-Host "📂 Loading .env file..."
 
