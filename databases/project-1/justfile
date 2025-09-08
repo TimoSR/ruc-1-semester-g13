@@ -1,6 +1,8 @@
 import "./commands/justfile"
 import "./commands/test2/justfile"
 
+# Load ENV
+set dotenv-load := true
 # Default: use pwsh (PowerShell 7+) for most recipes
 set shell := ["pwsh.exe", "-NoLogo", "-Command"]
 # So we don't print the command
