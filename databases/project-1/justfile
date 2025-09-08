@@ -4,7 +4,6 @@ import "./commands/test2/justfile"
 # Default: use pwsh (PowerShell 7+) for most recipes
 set shell := ["pwsh.exe", "-NoLogo", "-Command"]
 # So we don't print the command
-set dotenv-load := true
 set quiet := true
 
 default:
