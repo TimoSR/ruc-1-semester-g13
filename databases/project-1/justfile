@@ -1,5 +1,5 @@
-import "./commands/justfile"
-import "./commands/test2/justfile"
+import "./terminal-commands/justfile"
+import "./terminal-commands/test2/justfile"
 
 # Load ENV
 set dotenv-load := true
