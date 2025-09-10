@@ -1,4 +1,4 @@
-SELECT id, "name" , salary
+SELECT instructor.id, instructor.name, instructor.salary
 FROM instructor
-ORDER BY "name"
+ORDER BY instructor.name
 LIMIT 10 ;
