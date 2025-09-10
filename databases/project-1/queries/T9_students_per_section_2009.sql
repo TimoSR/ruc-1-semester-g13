@@ -1,16 +1,15 @@
-SELECT 
-    takes.course_id,
-    takes.sec_id,
-    takes.semester,
-    takes.year,
-    COUNT(takes.ID) AS student_count
-FROM takes
-WHERE takes.year = 2009
-GROUP BY 
-    takes.course_id, 
-    takes.sec_id, 
-    takes.semester, 
-    takes.year
-ORDER BY 
-    takes.course_id, 
-    takes.sec_id;
+WITH StudentCountPerSection AS (
+    SELECT 
+        course_id,
+        sec_id,
+        semester,
+        year,
+        COUNT(ID) AS student_count
+    FROM takes
+    WHERE year = 2009
+    GROUP BY course_id, sec_id, semester, year
+)
+
+SELECT *
+FROM StudentCountPerSection
+ORDER BY course_id, sec_id;

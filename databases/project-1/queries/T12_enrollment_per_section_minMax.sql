@@ -1,36 +1,17 @@
-WITH AllSections AS (
+WITH EnrollmentPerSection AS (
     SELECT 
-        course_id,
-        sec_id,
-        semester,
-        year
+        section.course_id,
+        section.sec_id,
+        section.semester,
+        section.year,
+        COALESCE(COUNT(takes.ID), 0) AS enrollment_count
     FROM section
-),
-
-Enrollments AS (
-    SELECT 
-        takes.course_id,
-        takes.sec_id,
-        takes.semester,
-        takes.year,
-        COUNT(takes.ID) AS enrollment_count
-    FROM takes
-    GROUP BY takes.course_id, takes.sec_id, takes.semester, takes.year
-),
-
-EnrollmentPerSection AS (
-    SELECT 
-        AllSections.course_id,
-        AllSections.sec_id,
-        AllSections.semester,
-        AllSections.year,
-        COALESCE(Enrollments.enrollment_count, 0) AS enrollment_count
-    FROM AllSections
-    LEFT JOIN Enrollments
-      ON AllSections.course_id = Enrollments.course_id
-     AND AllSections.sec_id   = Enrollments.sec_id
-     AND AllSections.semester = Enrollments.semester
-     AND AllSections.year     = Enrollments.year
+    LEFT JOIN takes
+      ON section.course_id = takes.course_id
+     AND section.sec_id   = takes.sec_id
+     AND section.semester = takes.semester
+     AND section.year     = takes.year
+    GROUP BY section.course_id, section.sec_id, section.semester, section.year
 )
 
 SELECT 
