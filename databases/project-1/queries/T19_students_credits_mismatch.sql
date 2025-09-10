@@ -4,7 +4,6 @@ WITH passed AS (
     SUM(c.credits) AS passed_credits
   FROM takes t
   JOIN course c ON c.course_id = t.course_id
-  -- "Bestået": alt der ikke er F og ikke NULL
   WHERE t.grade IS NOT NULL AND t.grade <> 'F'
   GROUP BY t.id
 )
