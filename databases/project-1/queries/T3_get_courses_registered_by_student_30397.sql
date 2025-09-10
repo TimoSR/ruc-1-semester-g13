@@ -1,3 +1,9 @@
+-- phase 1
+
+
+
+--
+
 SELECT 
     course.course_id,
     course.title
