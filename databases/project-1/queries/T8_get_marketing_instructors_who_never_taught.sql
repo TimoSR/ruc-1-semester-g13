@@ -19,9 +19,9 @@ WHERE instructor.dept_name = 'Marketing'
 
   -- phase 3 (optimizing readabilit)(DONE)
 
-  WITH InstructorsWhoHaveTaught AS (
-  SELECT DISTINCT teaches.id
-  FROM teaches
+WITH InstructorsWhoHaveTaught AS (
+SELECT DISTINCT teaches.id
+FROM teaches
 ),
 MarketingInstructorsWhoNeverTaught AS (
   SELECT instructor.ID, instructor.name
