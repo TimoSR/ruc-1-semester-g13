@@ -9,8 +9,7 @@ select * from course where credits = 3;
 
 -- phase 3 (DONE)
 
-SELECT course.title
+SELECT title
 FROM course
-WHERE
-    course.credits = 3
-    AND course.dept_name = 'Comp. Sci.';
+WHERE dept_name = 'Comp. Sci.'
+AND credits = 3;
