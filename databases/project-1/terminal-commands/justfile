@@ -1,0 +1,22 @@
+# We can also use @ to selectively silent
+hello:
+  Write-Output "Hello, world!"
+
+# Windows install via winget (PowerShell)
+install-pwsh-windows:
+    winget install --id Microsoft.Powershell --source winget --accept-source-agreements --accept-package-agreements
+    Install-Module -Name Emoji
+
+# macOS install via brew (Bash)
+install-pwsh-macos:
+    set shell := ["sh", "-c"]
+    brew install --cask powershell
+
+# Linux install via apt (Bash)
+install-pwsh-linux:
+    set shell := ["sh", "-c"]
+    sudo apt-get update && sudo apt-get install -y powershell
+
+# Check version (run in pwsh)
+check-pwsh:
+    pwsh -NoLogo -Command '$PSVersionTable.PSVersion.ToString()'
