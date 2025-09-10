@@ -7,7 +7,7 @@ select * from takes where takes.id = '30397';
 
 --
 
-SELECT 
+SELECT DISTINCT
     course.course_id,
     course.title
 FROM takes
