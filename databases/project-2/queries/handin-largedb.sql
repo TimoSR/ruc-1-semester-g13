@@ -19,7 +19,7 @@ BEGIN
 END;
 $$;
 
-select * from course_count('65901');
+SELECT course_count('65901');
 SELECT student.id, course_count(id) from student;
 
 -- 2
