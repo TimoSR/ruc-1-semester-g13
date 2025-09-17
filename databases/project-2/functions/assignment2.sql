@@ -1,6 +1,6 @@
 -- Q1
 -- count number of courses attended by given student id
-create or replace function course_count(student_id varchar(5))
+create or replace function course_count1(student_id varchar(5))
     returns integer
     language plpgsql as $$
     declare c_count integer;
@@ -11,9 +11,10 @@ create or replace function course_count(student_id varchar(5))
         return c_count;
     end;
     $$;
+
 -- test queries:
-select course_count('12345');
-select id,course_count(id) from student;
+select course_count1('12345');
+select id,course_count1(id) from student;
 
 -- Q2
 -- count number of course attended by given student id and department name
@@ -29,6 +30,7 @@ create or replace function course_count_2(student_id varchar(5), d_name varchar(
         return c_count;
     end;
     $$;
+
 -- test queries:
 select course_count_2('12345','Comp. Sci.');
 select id,name,course_count_2(id,'Comp. Sci.') from student;
@@ -52,7 +54,13 @@ create or replace function course_count(student_id varchar(5), d_name varchar(20
         return c_count;
     end;
     $$;
+-- explain your solution:
+-- d_name, the parameter for the department name, has a default value: 'null'.
+-- This means that when the function is called with only one parameter, the code will assume it's the student_id and it doensn't require a second parameter.
+-- If the second parameter is not null (or default), it will be considered for the query result.
+
 -- test queries:
+select course_count('12345');
 select course_count('12345','Comp. Sci.');
 select id,name,course_count(id,'Comp. Sci.') from student;
 
@@ -67,15 +75,14 @@ create or replace function department_activities(d_name varchar(20))
     language plpgsql as $$
     begin
         return query
-        -- (
-        select i.name, c.title, t.semester, t.year
+        select i.name as instructor_name, c.title as course_title, t.semester, t.year
         from instructor i
         join teaches t on i.id = t.id
         join course c on t.course_id = c.course_id
         where i.dept_name = d_name;
-        -- );
     end;
     $$;
+
 -- test queries:
 SELECT department_activities('Comp. Sci.');
 SELECT * from department_activities('Comp. Sci.'); -- correct query to return a table
@@ -94,7 +101,7 @@ create or replace function activities(db_name varchar(20))
         -- with department name
         if exists (select 1 from department d where d.dept_name = db_name) then
             return query
-            select i.dept_name, i.name, c.title, t.semester, t.year
+            select i.dept_name, i.name as instructor_name, c.title as course_title, t.semester, t.year
             from instructor i
             join teaches t on i.id = t.id
             join course c on t.course_id = c.course_id
@@ -102,7 +109,7 @@ create or replace function activities(db_name varchar(20))
         -- with building name
         elsif exists (select 1 from department d where d.building = db_name) then
             return query
-            select i.dept_name, i.name, c.title, t.semester, t.year
+            select i.dept_name, i.name as instructor_name, c.title as course_title, t.semester, t.year
             from instructor i
             join teaches t on i.id = t.id
             join department d on i.dept_name = d.dept_name
@@ -164,7 +171,6 @@ select name, followed_courses_by(name) from student;
 
 -- Q7
 -- rewrite q6 using for loop
--- TODO: change it so the matching results are found inside the for loop, maybe? :)
 create or replace function followed_courses_by(s_name varchar(20))
     returns text
     language plpgsql as $$
@@ -221,7 +227,7 @@ create or replace function followed_courses_by(s_name varchar(20))
             join student s on t.id = s.id
             where s.name = s_name
         )
-        select string_agg(i.name, ', ')
+        select string_agg(distinct i.name, ', ')
         into i_list
         from instructor i
         join teaches t on i.id = t.id
@@ -287,7 +293,49 @@ select name, taught_by(name) from student;
 
 -- Q10
 -- q10.1 | add extra column "teachers" to student table
+alter table student add column teachers text;
 -- q10.2 | update "teachers" column in students to list of their teachers
--- q10.3 | create insert triggers that keep the "teachers" column up to date after insert on takes and advisor tables
+update student s set teachers = taught_by(s.name);
+-- q10.3 | create 2 insert triggers that keep the "teachers" column up to date after insert on takes and advisor tables
+-- takes trigger function:
+create or replace function update_teachers_on_takes_update()
+returns trigger
+language plpgsql as $$
+begin
+    update student s
+    set teachers = taught_by(s.name)
+    where s.id = new.id;
+    return new;
+end;
+$$;
+-- takes trigger:
+create trigger takes_update
+after insert or update on takes
+for each row
+execute function update_teachers_on_takes_update();
+
+-- advisor trigger function:
+create or replace function update_teachers_on_advisor_update()
+returns trigger
+language plpgsql as $$
+begin
+    update student s
+    set teachers = taught_by(s.name)
+    where s.id = new.s_id;
+    return new;
+end;
+$$;
+-- advisor trigger:
+create trigger advisor_update
+after insert or update on advisor
+for each row
+execute function update_teachers_on_advisor_update();
+
 -- q10.4 | show that it works
 -- test queries:
+select id, name,teachers,followed_courses_by(name) from student;
+insert into takes values ('12345', 'BIO-101', '1', 'Summer', '2017', 'A');
+insert into takes values ('12345', 'HIS-351', '1', 'Spring', '2018', 'B');
+insert into advisor values ('54321', '32343');
+insert into advisor values ('55739', '76543');
+select id, name,teachers,followed_courses_by(name) from student;
