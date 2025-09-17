@@ -44,6 +44,8 @@ select id,name,course_count_2(id,'Comp. Sci.') from student;
 
 -- 3
 
+-- in PostgreSQL we cant define optional parameters But you can achieve the same effect by function overloading
+
 CREATE OR REPLACE FUNCTION course_count(student_id VARCHAR)
 RETURNS INTEGER
 LANGUAGE sql
