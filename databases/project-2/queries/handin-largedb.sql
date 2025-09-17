@@ -1,4 +1,5 @@
--- QUERY TRUNCATED
+-- GROUP: cit12, MEMBERS: Chiara Visca, Christopher Mads Hammerum Bouet, Mana Karki, Timothy Stoltzner Rasmussen
+
 -- 1
 
 select * from takes;
