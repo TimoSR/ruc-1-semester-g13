@@ -141,3 +141,149 @@ SELECT * FROM activities('Comp. Sci.');
 
 -- Input is a building
 SELECT * FROM activities('Watson');
+
+-- 6
+
+CREATE OR REPLACE FUNCTION followed_courses_by(student_name VARCHAR)
+RETURNS TEXT
+LANGUAGE sql
+AS $$
+WITH taught AS (
+    SELECT DISTINCT instructor.name AS instructor_name
+    FROM student
+    JOIN takes ON student.id = takes.id
+    JOIN teaches ON takes.course_id = teaches.course_id
+                AND takes.sec_id   = teaches.sec_id
+                AND takes.semester = teaches.semester
+                AND takes.year     = teaches.year
+    JOIN instructor ON teaches.id = instructor.id
+    WHERE student.name = student_name
+)
+SELECT string_agg(instructor_name, ', ' ORDER BY instructor_name)
+FROM taught;
+$$;
+
+-- Example 1: Specific student
+SELECT followed_courses_by('Levy');
+
+-- Example 2: Another student
+SELECT followed_courses_by('Shankar');
+
+-- Example 3: For all students
+SELECT name, followed_courses_by(name) FROM student;
+
+-- 7
+
+CREATE OR REPLACE FUNCTION followed_courses_by(student_name VARCHAR)
+RETURNS TEXT
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    rec RECORD;
+    result TEXT := '';
+BEGIN
+    FOR rec IN
+        WITH taught_instructors AS (
+            SELECT DISTINCT instructor.name AS instructor_name
+            FROM student
+            JOIN takes ON student.id = takes.id
+            JOIN teaches ON takes.course_id = teaches.course_id
+                        AND takes.sec_id   = teaches.sec_id
+                        AND takes.semester = teaches.semester
+                        AND takes.year     = teaches.year
+            JOIN instructor ON teaches.id = instructor.id
+            WHERE student.name = student_name
+        )
+        SELECT instructor_name
+        FROM taught_instructors
+    LOOP
+        IF result = '' THEN
+            result := rec.instructor_name;
+        ELSE
+            result := result || ', ' || rec.instructor_name;
+        END IF;
+    END LOOP;
+
+    RETURN result;
+END;
+$$;
+
+-- One student
+SELECT followed_courses_by('Shankar');
+
+-- All students
+SELECT name, followed_courses_by(name) FROM student;
+
+-- 8
+
+CREATE OR REPLACE FUNCTION followed_courses_by(student_name VARCHAR)
+RETURNS TEXT
+LANGUAGE sql
+AS $$
+WITH taught_instructors AS (
+    SELECT DISTINCT instructor.name AS instructor_name
+    FROM student
+    JOIN takes ON student.id = takes.id
+    JOIN teaches ON takes.course_id = teaches.course_id
+                AND takes.sec_id   = teaches.sec_id
+                AND takes.semester = teaches.semester
+                AND takes.year     = teaches.year
+    JOIN instructor ON teaches.id = instructor.id
+    WHERE student.name = student_name
+)
+SELECT string_agg(instructor_name, ', ' ORDER BY instructor_name)
+FROM taught_instructors;
+$$;
+
+
+-- Single student
+SELECT followed_courses_by('Shankar');
+
+-- All students
+SELECT name, followed_courses_by(name)
+FROM student;
+
+
+-- 9
+
+CREATE OR REPLACE FUNCTION taught_by(student_name VARCHAR)
+RETURNS TEXT
+LANGUAGE sql
+AS $$
+WITH instructors_from_courses AS (
+    SELECT DISTINCT instructor.name AS instructor_name
+    FROM student
+    JOIN takes ON student.id = takes.id
+    JOIN teaches ON takes.course_id = teaches.course_id
+                AND takes.sec_id   = teaches.sec_id
+                AND takes.semester = teaches.semester
+                AND takes.year     = teaches.year
+    JOIN instructor ON teaches.id = instructor.id
+    WHERE student.name = student_name
+),
+instructors_from_advisors AS (
+    SELECT DISTINCT instructor.name AS instructor_name
+    FROM student
+    JOIN advisor ON student.id = advisor.s_id
+    JOIN instructor ON advisor.i_id = instructor.id
+    WHERE student.name = student_name
+),
+all_instructors AS (
+    SELECT * FROM instructors_from_courses
+    UNION
+    SELECT * FROM instructors_from_advisors
+)
+SELECT string_agg(instructor_name, ', ' ORDER BY instructor_name)
+FROM all_instructors;
+$$;
+
+
+-- For one student
+SELECT taught_by('Shankar');
+
+-- For all students
+SELECT name, taught_by(name)
+FROM student;
+
+-- 10
+
