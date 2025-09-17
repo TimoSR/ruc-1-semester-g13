@@ -1,0 +1,22 @@
+ROP FUNCTION IF EXISTS department_activities(VARCHAR);
+
+CREATE FUNCTION department_activities(dept_name VARCHAR)
+RETURNS TABLE (
+    instructor_name VARCHAR,
+    course_title VARCHAR,
+    semester VARCHAR,
+    year INT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT i.name, c.title, t.semester, t.year::INT
+    FROM instructor i
+    JOIN teaches t ON i.id = t.id
+    JOIN course c ON t.course_id = c.course_id
+    JOIN department d ON i.dept_name = d.dept_name
+    WHERE d.dept_name = 'Comp. Sci,';
+END;
+$$ LANGUAGE plpgsql;
+SHOW TABLE;
+
+SELECT department_activities('Comp. Sci.');
