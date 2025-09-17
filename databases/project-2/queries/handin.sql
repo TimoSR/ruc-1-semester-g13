@@ -287,3 +287,83 @@ FROM student;
 
 -- 10
 
+------------------------------------------------------------
+-- Step 1. Add teachers column if not exists
+------------------------------------------------------------
+ALTER TABLE student
+ADD COLUMN IF NOT EXISTS teachers TEXT;
+
+------------------------------------------------------------
+-- Step 2. Initialize column for all existing students
+------------------------------------------------------------
+UPDATE student
+SET teachers = taught_by(name);
+
+------------------------------------------------------------
+-- Step 3. Takes trigger function
+------------------------------------------------------------
+CREATE OR REPLACE FUNCTION update_teachers_on_takes_update()
+RETURNS TRIGGER
+LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE student s
+    SET teachers = taught_by(s.name)
+    WHERE s.id = NEW.id;
+    RETURN NEW;
+END;
+$$;
+
+-- Drop old trigger if it exists, then recreate
+DROP TRIGGER IF EXISTS takes_update ON takes;
+CREATE TRIGGER takes_update
+AFTER INSERT OR UPDATE ON takes
+FOR EACH ROW
+EXECUTE FUNCTION update_teachers_on_takes_update();
+
+------------------------------------------------------------
+-- Step 4. Advisor trigger function
+------------------------------------------------------------
+CREATE OR REPLACE FUNCTION update_teachers_on_advisor_update()
+RETURNS TRIGGER
+LANGUAGE plpgsql 
+AS $$
+BEGIN
+    UPDATE student s
+    SET teachers = taught_by(s.name)
+    WHERE s.id = NEW.s_id;
+    RETURN NEW;
+END;
+$$;
+
+-- Drop old trigger if it exists, then recreate
+DROP TRIGGER IF EXISTS advisor_update ON advisor;
+CREATE TRIGGER advisor_update
+AFTER INSERT OR UPDATE ON advisor
+FOR EACH ROW
+EXECUTE FUNCTION update_teachers_on_advisor_update();
+
+------------------------------------------------------------
+-- Step 5. Test queries
+------------------------------------------------------------
+-- Show before
+SELECT id, name, teachers, followed_courses_by(name) FROM student;
+
+-- Ensure section exists
+INSERT INTO section (course_id, sec_id, semester, year, building, room_number, time_slot_id)
+VALUES ('BIO-101', '1', 'Summer', 2017, 'Watson', '100', 'A1')
+ON CONFLICT DO NOTHING;  -- avoids error if it already exists
+
+INSERT INTO section (course_id, sec_id, semester, year, building, room_number, time_slot_id)
+VALUES ('HIS-351', '1', 'Spring', 2018, 'Packard', '201', 'B2')
+ON CONFLICT DO NOTHING;
+
+-- Insert new course registrations
+INSERT INTO takes VALUES ('12345', 'BIO-101', '1', 'Summer', '2017', 'A');
+INSERT INTO takes VALUES ('12345', 'HIS-351', '1', 'Spring', '2018', 'B');
+
+-- Insert new advisors
+INSERT INTO advisor VALUES ('54321', '32343');
+INSERT INTO advisor VALUES ('55739', '76543');
+
+-- Show after
+SELECT id, name, teachers, followed_courses_by(name) FROM student;
