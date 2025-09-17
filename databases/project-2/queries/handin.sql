@@ -243,7 +243,6 @@ SELECT followed_courses_by('Shankar');
 SELECT name, followed_courses_by(name)
 FROM student;
 
-
 -- 9
 
 CREATE OR REPLACE FUNCTION taught_by(student_name VARCHAR)
@@ -277,7 +276,6 @@ SELECT string_agg(instructor_name, ', ' ORDER BY instructor_name)
 FROM all_instructors;
 $$;
 
-
 -- For one student
 SELECT taught_by('Shankar');
 
@@ -287,83 +285,52 @@ FROM student;
 
 -- 10
 
-------------------------------------------------------------
--- Step 1. Add teachers column if not exists
-------------------------------------------------------------
-ALTER TABLE student
-ADD COLUMN IF NOT EXISTS teachers TEXT;
+alter table student 
+add column if not exists teachers text;
 
-------------------------------------------------------------
--- Step 2. Initialize column for all existing students
-------------------------------------------------------------
-UPDATE student
-SET teachers = taught_by(name);
+update student s 
+set teachers = taught_by(s.name);
 
-------------------------------------------------------------
--- Step 3. Takes trigger function
-------------------------------------------------------------
-CREATE OR REPLACE FUNCTION update_teachers_on_takes_update()
-RETURNS TRIGGER
-LANGUAGE plpgsql AS $$
-BEGIN
-    UPDATE student s
-    SET teachers = taught_by(s.name)
-    WHERE s.id = NEW.id;
-    RETURN NEW;
-END;
+create or replace function update_teachers_on_takes_update()
+returns trigger
+language plpgsql as $$
+begin
+    update student s
+    set teachers = taught_by(s.name)
+    where s.id = new.id;
+    return new;
+end;
 $$;
 
--- Drop old trigger if it exists, then recreate
-DROP TRIGGER IF EXISTS takes_update ON takes;
-CREATE TRIGGER takes_update
-AFTER INSERT OR UPDATE ON takes
-FOR EACH ROW
-EXECUTE FUNCTION update_teachers_on_takes_update();
+-- takes trigger (drop if exists, then create fresh):
+drop trigger if exists takes_update on takes;
+create trigger takes_update
+after insert or update on takes
+for each row
+execute function update_teachers_on_takes_update();
 
-------------------------------------------------------------
--- Step 4. Advisor trigger function
-------------------------------------------------------------
-CREATE OR REPLACE FUNCTION update_teachers_on_advisor_update()
-RETURNS TRIGGER
-LANGUAGE plpgsql 
-AS $$
-BEGIN
-    UPDATE student s
-    SET teachers = taught_by(s.name)
-    WHERE s.id = NEW.s_id;
-    RETURN NEW;
-END;
+-- advisor trigger function:
+create or replace function update_teachers_on_advisor_update()
+returns trigger
+language plpgsql as $$
+begin
+    update student s
+    set teachers = taught_by(s.name)
+    where s.id = new.s_id;
+    return new;
+end;
 $$;
 
--- Drop old trigger if it exists, then recreate
-DROP TRIGGER IF EXISTS advisor_update ON advisor;
-CREATE TRIGGER advisor_update
-AFTER INSERT OR UPDATE ON advisor
-FOR EACH ROW
-EXECUTE FUNCTION update_teachers_on_advisor_update();
+-- advisor trigger (drop if exists, then create fresh):
+drop trigger if exists advisor_update on advisor;
+create trigger advisor_update
+after insert or update on advisor
+for each row
+execute function update_teachers_on_advisor_update();
 
-------------------------------------------------------------
--- Step 5. Test queries
-------------------------------------------------------------
--- Show before
-SELECT id, name, teachers, followed_courses_by(name) FROM student;
-
--- Ensure section exists
-INSERT INTO section (course_id, sec_id, semester, year, building, room_number, time_slot_id)
-VALUES ('BIO-101', '1', 'Summer', 2017, 'Watson', '100', 'A1')
-ON CONFLICT DO NOTHING;  -- avoids error if it already exists
-
-INSERT INTO section (course_id, sec_id, semester, year, building, room_number, time_slot_id)
-VALUES ('HIS-351', '1', 'Spring', 2018, 'Packard', '201', 'B2')
-ON CONFLICT DO NOTHING;
-
--- Insert new course registrations
-INSERT INTO takes VALUES ('12345', 'BIO-101', '1', 'Summer', '2017', 'A');
-INSERT INTO takes VALUES ('12345', 'HIS-351', '1', 'Spring', '2018', 'B');
-
--- Insert new advisors
-INSERT INTO advisor VALUES ('54321', '32343');
-INSERT INTO advisor VALUES ('55739', '76543');
-
--- Show after
-SELECT id, name, teachers, followed_courses_by(name) FROM student;
+select id, name,teachers,followed_courses_by(name) from student;
+insert into takes values ('12345', 'BIO-101', '1', 'Summer', '2017', 'A');
+insert into takes values ('12345', 'HIS-351', '1', 'Spring', '2018', 'B');
+insert into advisor values ('54321', '32343');
+insert into advisor values ('55739', '76543');
+select id, name,teachers,followed_courses_by(name) from student;
