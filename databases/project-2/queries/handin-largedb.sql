@@ -1,3 +1,4 @@
+-- QUERY TRUNCATED
 -- 1
 
 select * from takes;
@@ -8,14 +9,16 @@ AS $$
 DECLARE
   course_total INTEGER;
 BEGIN
-  SELECT COUNT(course_id) INTO course_total
+  SELECT COUNT(course_id)
+  INTO course_total
   FROM takes
   WHERE id = student_id;
+  
   RETURN course_total;
 END;
 $$;
 
-SELECT FROM course_count('12345');
+select * from course_count('65901');
 SELECT student.id, course_count(id) from student;
 
 -- 2
@@ -35,16 +38,14 @@ BEGIN
 END;
 $$;
 
-select course_count_2('12345','Comp. Sci.');
+select course_count_2('65901','comp. sci.');
 select id,name,course_count_2(id,'Comp. Sci.') from student;
 
 -- 3
 
--- in PostgreSQL we cant define optional parameters But you can achieve the same effect by function overloading
-
 CREATE OR REPLACE FUNCTION course_count(student_id VARCHAR)
 RETURNS INTEGER
-LANGUAGE plpgsql
+LANGUAGE sql
 AS $$
   SELECT COUNT(course_id)
   FROM takes
@@ -53,7 +54,7 @@ $$;
 
 CREATE OR REPLACE FUNCTION course_count(student_id VARCHAR, department_name VARCHAR)
 RETURNS INTEGER
-LANGUAGE plpgsql
+LANGUAGE sql
 AS $$
   SELECT COUNT(*)
   FROM takes
@@ -62,10 +63,10 @@ AS $$
 $$;
 
 -- One-parameter usage
-SELECT course_count('12345');
+SELECT course_count('65901');
 
 -- Two-parameter usage
-SELECT course_count('12345', 'Comp. Sci.');
+SELECT course_count('65901','comp. sci.');
 
 -- 4
 
@@ -135,12 +136,11 @@ WHERE dept_name ILIKE input_name
    OR building ILIKE input_name;
 $$;
 
-
 -- Input is a department
 SELECT * FROM activities('Comp. Sci.');
 
 -- Input is a building
-SELECT * FROM activities('Watson');
+SELECT * FROM activities('Mercer');
 
 -- 6
 
@@ -164,13 +164,14 @@ FROM taught;
 $$;
 
 -- Example 1: Specific student
-SELECT followed_courses_by('Levy');
+SELECT followed_courses_by('Rumat');
 
 -- Example 2: Another student
-SELECT followed_courses_by('Shankar');
+SELECT followed_courses_by('Samel');
 
 -- Example 3: For all students
-SELECT name, followed_courses_by(name) FROM student;
+SELECT name, followed_courses_by(name)
+FROM student;
 
 -- 7
 
@@ -209,10 +210,11 @@ END;
 $$;
 
 -- One student
-SELECT followed_courses_by('Shankar');
+SELECT followed_courses_by('Rumat');
 
 -- All students
-SELECT name, followed_courses_by(name) FROM student;
+SELECT name, followed_courses_by(name)
+FROM student;
 
 -- 8
 
@@ -235,9 +237,8 @@ SELECT string_agg(instructor_name, ', ' ORDER BY instructor_name)
 FROM taught_instructors;
 $$;
 
-
 -- Single student
-SELECT followed_courses_by('Shankar');
+SELECT followed_courses_by('Rumat');
 
 -- All students
 SELECT name, followed_courses_by(name)
@@ -277,7 +278,7 @@ FROM all_instructors;
 $$;
 
 -- For one student
-SELECT taught_by('Shankar');
+SELECT taught_by('Rumat');
 
 -- For all students
 SELECT name, taught_by(name)
@@ -285,12 +286,15 @@ FROM student;
 
 -- 10
 
+-- q10.1 | add extra column "teachers" to student table
 alter table student 
 add column if not exists teachers text;
 
-update student s 
-set teachers = taught_by(s.name);
+-- q10.2 | update "teachers" column in students to list of their teachers
+update student s set teachers = taught_by(s.name);
 
+-- q10.3 | create 2 insert triggers that keep the "teachers" column up to date after insert on takes and advisor tables
+-- takes trigger function:
 create or replace function update_teachers_on_takes_update()
 returns trigger
 language plpgsql as $$
@@ -302,7 +306,7 @@ begin
 end;
 $$;
 
--- takes trigger (drop if exists, then create fresh):
+-- takes trigger:
 drop trigger if exists takes_update on takes;
 create trigger takes_update
 after insert or update on takes
@@ -321,16 +325,37 @@ begin
 end;
 $$;
 
--- advisor trigger (drop if exists, then create fresh):
+-- advisor trigger:
 drop trigger if exists advisor_update on advisor;
 create trigger advisor_update
 after insert or update on advisor
 for each row
 execute function update_teachers_on_advisor_update();
 
-select id, name,teachers,followed_courses_by(name) from student;
-insert into takes values ('12345', 'BIO-101', '1', 'Summer', '2017', 'A');
-insert into takes values ('12345', 'HIS-351', '1', 'Spring', '2018', 'B');
-insert into advisor values ('54321', '32343');
-insert into advisor values ('55739', '76543');
+insert into student (id, name, dept_name, tot_cred)
+values ('54321', 'Temp Student A', 'Comp. Sci.', 0)
+on conflict (id) do nothing;
+
+insert into student (id, name, dept_name, tot_cred)
+values ('55739', 'Temp Student B', 'History', 0)
+on conflict (id) do nothing;
+
+-- ensure instructor exists
+insert into instructor (id, name, dept_name, salary)
+values ('32343', 'Prof. Smith', 'Comp. Sci.', 80000)
+on conflict (id) do nothing;
+
+insert into instructor (id, name, dept_name, salary)
+values ('76543', 'Prof. Brown', 'History', 70000)
+on conflict (id) do nothing;
+
+-- now your advisor inserts will succeed
+INSERT INTO advisor (s_id, i_id)
+VALUES ('54321', '32343')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO advisor (s_id, i_id)
+VALUES ('55739', '76543')
+ON CONFLICT DO NOTHING;
+
 select id, name,teachers,followed_courses_by(name) from student;
