@@ -2,7 +2,7 @@
 
 -- 1
 
-select * from takes;
+SELECT * from takes;
 
 CREATE OR REPLACE FUNCTION course_count(student_id VARCHAR) RETURNS INTEGER
 LANGUAGE plpgsql
@@ -39,8 +39,8 @@ BEGIN
 END;
 $$;
 
-select course_count_2('12345','Comp. Sci.');
-select id,name,course_count_2(id,'Comp. Sci.') from student;
+SELECT course_count_2('12345','Comp. Sci.');
+SELECT id,name,course_count_2(id,'Comp. Sci.') from student;
 
 -- 3
 
@@ -360,4 +360,4 @@ INSERT INTO advisor (s_id, i_id)
 VALUES ('55739', '76543')
 ON CONFLICT DO NOTHING;
 
-select id, name,teachers,followed_courses_by(name) from student;
+SELECT id, name,teachers,followed_courses_by(name) from student;
