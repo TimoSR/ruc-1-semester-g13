@@ -99,3 +99,45 @@ SELECT * FROM department_activities('Comp. Sci.');
 
 -- 5
 
+CREATE OR REPLACE FUNCTION activities(input_name VARCHAR)
+RETURNS TABLE(
+    dept_name VARCHAR,
+    instructor_name VARCHAR,
+    course_title VARCHAR,
+    semester VARCHAR,
+    year INT
+)
+LANGUAGE sql
+AS $$
+WITH base AS (
+    SELECT department.dept_name,
+           instructor.name,
+           course.title,
+           section.semester,
+           section.year,
+           department.building
+    FROM instructor
+    JOIN teaches ON instructor.id = teaches.id
+    JOIN section ON teaches.course_id = section.course_id
+                AND teaches.sec_id   = section.sec_id
+                AND teaches.semester = section.semester
+                AND teaches.year     = section.year
+    JOIN course ON section.course_id = course.course_id
+    JOIN department ON instructor.dept_name = department.dept_name
+)
+SELECT dept_name,
+       name AS instructor_name,
+       title AS course_title,
+       semester,
+       year::INT
+FROM base
+WHERE dept_name ILIKE input_name
+   OR building ILIKE input_name;
+$$;
+
+
+-- Input is a department
+SELECT * FROM activities('Comp. Sci.');
+
+-- Input is a building
+SELECT * FROM activities('Watson');
