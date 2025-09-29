@@ -1,6 +1,4 @@
 -- B2_build_movie_db.sql
--- Migration script from IMDb source tables to new Movie Data Model
--- This script can be run repeatedly - it drops and recreates all tables
 
 -- ============================================
 -- STEP 1: DROP EXISTING TABLES (for repeatability)
@@ -20,41 +18,47 @@ DROP TABLE IF EXISTS title CASCADE;
 -- STEP 2: CREATE NEW SCHEMA TABLES
 -- ============================================
 
--- Title table (main entity for all titles)
+-- Chris
 CREATE TABLE title (
-    id VARCHAR(10) PRIMARY KEY,
-    title_type VARCHAR(50),
-    primary_title TEXT,
-    original_title TEXT,
-    is_adult BOOLEAN,
-    start_year INTEGER,
-    end_year INTEGER,
-    runtime_minutes INTEGER,
-    poster_url TEXT,
-    plot TEXT
+    id VARCHAR(20) PRIMARY KEY,           
+    title_type VARCHAR(50) NOT NULL,
+    primary_title VARCHAR(500) NOT NULL,
+    original_title VARCHAR(500),
+    is_adult BOOLEAN DEFAULT FALSE NOT NULL,
+    start_year CHAR(4),
+    end_year CHAR(4),
+    runtime_minutes INT,
+    poster_url TEXT,      
+    plot TEXT              
 );
 
--- Episode table (for TV episodes)
+-- Chris
+CREATE TABLE rating (
+    title_id VARCHAR(20) PRIMARY KEY REFERENCES title(id) ON DELETE CASCADE,
+    average_rating FLOAT CHECK (average_rating BETWEEN 0 AND 10),
+    num_votes INT CHECK (num_votes >= 0)
+);
+
+-- Chris
+CREATE TABLE genre (
+    title_id VARCHAR(20) NOT NULL REFERENCES title(id) ON DELETE CASCADE,
+    genre VARCHAR(50) NOT NULL,
+    PRIMARY KEY (title_id, genre)
+);
+
+-- Chiara
 CREATE TABLE episode (
-    title_id VARCHAR(10) PRIMARY KEY,
+    title_id VARCHAR(20) PRIMARY KEY,
     parent_id VARCHAR(10),
     season_number INTEGER,
     episode_number INTEGER,
     FOREIGN KEY (title_id) REFERENCES title(id) ON DELETE CASCADE
 );
 
--- Genre table (normalized from comma-separated values)
-CREATE TABLE genre (
-    title_id VARCHAR(10),
-    genre VARCHAR(100),
-    PRIMARY KEY (title_id, genre),
-    FOREIGN KEY (title_id) REFERENCES title(id) ON DELETE CASCADE
-);
-
--- Also Known As table
+-- Chiara
 CREATE TABLE also_known_as (
     id SERIAL PRIMARY KEY,
-    title_id VARCHAR(10),
+    title_id VARCHAR(20),
     list_order INTEGER,
     title TEXT,
     region VARCHAR(10),
@@ -65,57 +69,57 @@ CREATE TABLE also_known_as (
     FOREIGN KEY (title_id) REFERENCES title(id) ON DELETE CASCADE
 );
 
--- Rating table
-CREATE TABLE rating (
-    title_id VARCHAR(10) PRIMARY KEY,
-    average_rating NUMERIC(3,1),
-    num_votes INTEGER,
-    FOREIGN KEY (title_id) REFERENCES title(id) ON DELETE CASCADE
-);
-
--- Person table
+-- Mana
 CREATE TABLE person (
-    id VARCHAR(10) PRIMARY KEY,
-    primary_name TEXT,
-    birth_year INTEGER,
-    death_year INTEGER,
-    primary_professions TEXT
+-- changed person_id > id and name > primary_name
+  id VARCHAR(20) PRIMARY KEY,      
+  primary_name VARCHAR(100) NOT NULL,               
+  birth_year INT,
+  death_year INT
 );
 
--- Person Known For table (normalized from comma-separated values)
+-- Mana
+-- CREATE TABLE person_known_for (
+--   person_id VARCHAR(50) REFERENCES person(person_id),
+-- --   I would add ON DELETE CASCADE and the reference to the title_id
+--   title_id VARCHAR(50),                   
+--   PRIMARY KEY (person_id, title_id)
+-- );
+
+-- Chiara: reworked version
 CREATE TABLE person_known_for (
-    person_id VARCHAR(10),
-    title_id VARCHAR(10),
-    PRIMARY KEY (person_id, title_id),
-    FOREIGN KEY (person_id) REFERENCES person(id) ON DELETE CASCADE,
-    FOREIGN KEY (title_id) REFERENCES title(id) ON DELETE CASCADE
+    person_id VARCHAR(20) REFERENCES person(id) ON DELETE CASCADE,
+    title_id VARCHAR(20) REFERENCES title(id) ON DELETE CASCADE,
+    PRIMARY KEY (person_id, title_id)
 );
 
--- Person Profession table (normalized from comma-separated values)
+-- Chiara
 CREATE TABLE person_profession (
-    person_id VARCHAR(10),
+    person_id VARCHAR(20) REFERENCES person(id) ON DELETE CASCADE,
     profession TEXT,
-    PRIMARY KEY (person_id, profession),
-    FOREIGN KEY (person_id) REFERENCES person(id) ON DELETE CASCADE
+    PRIMARY KEY (person_id, profession)
 );
 
--- Crew table (directors, writers, other non-acting crew)
+-- Chiara
 CREATE TABLE crew (
-    title_id VARCHAR(10),
-    person_id VARCHAR(10),
+    -- serial ID could be used for order crediting but I left it as is for now
+    title_id VARCHAR(20),
+    person_id VARCHAR(20),
     category TEXT,
     job TEXT,
+    -- renamed ordering to credit_order to make it more clear
     credit_order INTEGER,
     PRIMARY KEY (title_id, person_id, category),
     FOREIGN KEY (title_id) REFERENCES title(id) ON DELETE CASCADE,
     FOREIGN KEY (person_id) REFERENCES person(id) ON DELETE CASCADE
 );
 
--- Actor table
+-- Chiara
 CREATE TABLE actor (
-    title_id VARCHAR(10),
-    person_id VARCHAR(10),
+    title_id VARCHAR(20),
+    person_id VARCHAR(20),
     character_name TEXT,
+    -- renamed ordering to credit_order to make it more clear
     credit_order INTEGER,
     PRIMARY KEY (title_id, person_id),
     FOREIGN KEY (title_id) REFERENCES title(id) ON DELETE CASCADE,
@@ -134,22 +138,25 @@ SELECT
     tb.titletype,
     tb.primarytitle,
     tb.originaltitle,
-    tb.isadult::BOOLEAN,
-    tb.startyear::INTEGER,
-    tb.endyear::INTEGER,
-    tb.runtimeminutes::INTEGER,
+    (tb.isadult = '1')::BOOLEAN,   -- IMDb stores as '0' or '1'
+    tb.startyear,
+    tb.endyear,
+    tb.runtimeminutes,
     od.poster,
     od.plot
 FROM title_basics tb
 LEFT JOIN omdb_data od ON tb.tconst = od.tconst;
+
+-- DEBUGGING -> Just checking that titles were migrated correctly since the rest depends on it:
+SELECT COUNT(*) FROM title;
 
 -- Migrate episode data
 INSERT INTO episode (title_id, parent_id, season_number, episode_number)
 SELECT 
     tconst,
     parenttconst,
-    seasonnumber::INTEGER,
-    episodenumber::INTEGER
+    seasonnumber,
+    episodenumber
 FROM title_episode
 WHERE tconst IN (SELECT id FROM title);
 
@@ -189,19 +196,18 @@ WHERE titleid IN (SELECT id FROM title);
 INSERT INTO rating (title_id, average_rating, num_votes)
 SELECT 
     tconst,
-    averagerating::NUMERIC(3,1),
-    numvotes::INTEGER
+    NULLIF(averagerating, '\N')::NUMERIC(3,1),
+    NULLIF(numvotes, '\N')::INT
 FROM title_ratings
 WHERE tconst IN (SELECT id FROM title);
 
 -- Migrate person data
-INSERT INTO person (id, primary_name, birth_year, death_year, primary_professions)
+INSERT INTO person (id, primary_name, birth_year, death_year)
 SELECT 
     nconst,
     primaryname,
-    birthyear::INTEGER,
-    deathyear::INTEGER,
-    primaryprofession
+    NULLIF(birthyear, '\N')::INT,
+    NULLIF(deathyear, '\N')::INT
 FROM name_basics;
 
 -- Migrate and normalize person known for titles
@@ -250,7 +256,7 @@ DECLARE
 BEGIN
     FOR rec IN SELECT tconst, directors FROM title_crew WHERE directors IS NOT NULL
     LOOP
-        FOREACH director_item IN ARRAY string_to_array(rec.directors, ',')
+        FOREACH director_item IN ARRAY string_to_array(NULLIF(rec.directors, '\N'), ',')
         LOOP
             IF EXISTS (SELECT 1 FROM person WHERE id = TRIM(director_item)) 
                AND EXISTS (SELECT 1 FROM title WHERE id = rec.tconst) THEN
@@ -270,7 +276,7 @@ DECLARE
 BEGIN
     FOR rec IN SELECT tconst, writers FROM title_crew WHERE writers IS NOT NULL
     LOOP
-        FOREACH writer_item IN ARRAY string_to_array(rec.writers, ',')
+        FOREACH writer_item IN ARRAY string_to_array(NULLIF(rec.writers, '\N'), ',')
         LOOP
             IF EXISTS (SELECT 1 FROM person WHERE id = TRIM(writer_item)) 
                AND EXISTS (SELECT 1 FROM title WHERE id = rec.tconst) THEN
@@ -288,10 +294,10 @@ SELECT
     tp.tconst,
     tp.nconst,
     tp.category,
-    tp.job,
-    tp.ordering::INTEGER
+    NULLIF(tp.job, '\N'),
+    NULLIF(tp.ordering, '\N')::INT
 FROM title_principals tp
-WHERE tp.category NOT IN ('actor', 'actress', 'self', 'archive_footage', 'archive_sound')
+WHERE tp.category NOT IN ('actor', 'actress', 'self')
   AND EXISTS (SELECT 1 FROM person WHERE id = tp.nconst)
   AND EXISTS (SELECT 1 FROM title WHERE id = tp.tconst)
 ON CONFLICT (title_id, person_id, category) DO NOTHING;
@@ -301,8 +307,8 @@ INSERT INTO actor (title_id, person_id, character_name, credit_order)
 SELECT 
     tp.tconst,
     tp.nconst,
-    tp.characters,
-    tp.ordering::INTEGER
+    NULLIF(tp.characters, '\N'),
+    NULLIF(tp.ordering, '\N')::INT
 FROM title_principals tp
 WHERE tp.category IN ('actor', 'actress', 'self')
   AND EXISTS (SELECT 1 FROM person WHERE id = tp.nconst)
@@ -310,62 +316,26 @@ WHERE tp.category IN ('actor', 'actress', 'self')
 ON CONFLICT (title_id, person_id) DO NOTHING;
 
 -- ============================================
--- STEP 4: CREATE INDEXES FOR PERFORMANCE
--- ============================================
-
--- Indexes for foreign key lookups
-CREATE INDEX idx_episode_parent_id ON episode(parent_id);
-CREATE INDEX idx_genre_title_id ON genre(title_id);
-CREATE INDEX idx_also_known_as_title_id ON also_known_as(title_id);
-CREATE INDEX idx_person_known_for_person_id ON person_known_for(person_id);
-CREATE INDEX idx_person_known_for_title_id ON person_known_for(title_id);
-CREATE INDEX idx_person_profession_person_id ON person_profession(person_id);
-CREATE INDEX idx_crew_title_id ON crew(title_id);
-CREATE INDEX idx_crew_person_id ON crew(person_id);
-CREATE INDEX idx_actor_title_id ON actor(title_id);
-CREATE INDEX idx_actor_person_id ON actor(person_id);
-
--- Indexes for common queries
-CREATE INDEX idx_title_type ON title(title_type);
-CREATE INDEX idx_title_start_year ON title(start_year);
-CREATE INDEX idx_person_primary_name ON person(primary_name);
-
--- ============================================
 -- STEP 5: DROP SOURCE TABLES
 -- ============================================
 
-DROP TABLE IF EXISTS title_akas CASCADE;
-DROP TABLE IF EXISTS title_basics CASCADE;
-DROP TABLE IF EXISTS title_crew CASCADE;
-DROP TABLE IF EXISTS title_episode CASCADE;
-DROP TABLE IF EXISTS title_principals CASCADE;
-DROP TABLE IF EXISTS title_ratings CASCADE;
-DROP TABLE IF EXISTS name_basics CASCADE;
-DROP TABLE IF EXISTS omdb_data CASCADE;
+-- DROP TABLE IF EXISTS title_akas CASCADE;
+-- DROP TABLE IF EXISTS title_basics CASCADE;
+-- DROP TABLE IF EXISTS title_crew CASCADE;
+-- DROP TABLE IF EXISTS title_episode CASCADE;
+-- DROP TABLE IF EXISTS title_principals CASCADE;
+-- DROP TABLE IF EXISTS title_ratings CASCADE;
+-- DROP TABLE IF EXISTS name_basics CASCADE;
+-- DROP TABLE IF EXISTS omdb_data CASCADE;
 
 -- ============================================
--- STEP 6: ANALYZE TABLES FOR QUERY OPTIMIZATION
+-- VERIFICATION QUERIES
 -- ============================================
 
-ANALYZE title;
-ANALYZE episode;
-ANALYZE genre;
-ANALYZE also_known_as;
-ANALYZE rating;
-ANALYZE person;
-ANALYZE person_known_for;
-ANALYZE person_profession;
-ANALYZE crew;
-ANALYZE actor;
-
--- ============================================
--- VERIFICATION QUERIES (Optional - uncomment to test)
--- ============================================
-
--- SELECT 'Titles migrated:' AS info, COUNT(*) AS count FROM title;
--- SELECT 'Episodes migrated:' AS info, COUNT(*) AS count FROM episode;
--- SELECT 'Genres migrated:' AS info, COUNT(*) AS count FROM genre;
--- SELECT 'Ratings migrated:' AS info, COUNT(*) AS count FROM rating;
--- SELECT 'Persons migrated:' AS info, COUNT(*) AS count FROM person;
--- SELECT 'Actors migrated:' AS info, COUNT(*) AS count FROM actor;
--- SELECT 'Crew migrated:' AS info, COUNT(*) AS count FROM crew;
+SELECT 'Titles migrated:' AS info, COUNT(*) AS count FROM title;
+SELECT 'Episodes migrated:' AS info, COUNT(*) AS count FROM episode;
+SELECT 'Genres migrated:' AS info, COUNT(*) AS count FROM genre;
+SELECT 'Ratings migrated:' AS info, COUNT(*) AS count FROM rating;
+SELECT 'Persons migrated:' AS info, COUNT(*) AS count FROM person;
+SELECT 'Actors migrated:' AS info, COUNT(*) AS count FROM actor;
+SELECT 'Crew migrated:' AS info, COUNT(*) AS count FROM crew;
