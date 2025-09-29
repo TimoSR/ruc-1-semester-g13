@@ -24,7 +24,7 @@ CREATE TABLE search_history (
     id SERIAL PRIMARY KEY,
     profile_id INT NOT NULL REFERENCES profile(id) ON DELETE CASCADE,
     search_query TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW(),
+    created_at TIMESTAMP DEFAULT NOW()
 );
 
 -- Chiara
@@ -50,8 +50,8 @@ CREATE TABLE bookmark (
         (bookmark_type = 'person' AND person_id IS NOT NULL AND title_id IS NULL)
     ),
     -- Prevent duplicate bookmarks
-    CONSTRAINT unique_user_title_bookmark UNIQUE (user_id, title_id),
-    CONSTRAINT unique_user_person_bookmark UNIQUE (user_id, person_id),
+    CONSTRAINT unique_user_title_bookmark UNIQUE (profile_id, title_id),
+    CONSTRAINT unique_user_person_bookmark UNIQUE (profile_id, person_id)
 );
 
 -- ============================================

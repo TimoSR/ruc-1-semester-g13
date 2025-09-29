@@ -25,8 +25,9 @@ CREATE TABLE title (
     primary_title VARCHAR(500) NOT NULL,
     original_title VARCHAR(500),
     is_adult BOOLEAN DEFAULT FALSE NOT NULL,
-    start_year CHAR(4),
-    end_year CHAR(4),
+    -- keep as int actually
+    start_year INT,
+    end_year INT,
     runtime_minutes INT,
     poster_url TEXT,      
     plot TEXT              
@@ -48,25 +49,23 @@ CREATE TABLE genre (
 
 -- Chiara
 CREATE TABLE episode (
-    title_id VARCHAR(20) PRIMARY KEY,
-    parent_id VARCHAR(10),
-    season_number INTEGER,
-    episode_number INTEGER,
-    FOREIGN KEY (title_id) REFERENCES title(id) ON DELETE CASCADE
+    title_id VARCHAR(20) PRIMARY KEY REFERENCES title(id) ON DELETE CASCADE,
+    parent_id VARCHAR(10) REFERENCES title(id),
+    season_number INT,
+    episode_number INT
 );
 
 -- Chiara
 CREATE TABLE also_known_as (
     id SERIAL PRIMARY KEY,
-    title_id VARCHAR(20),
+    title_id VARCHAR(20) NOT NULL REFERENCES title(id) ON DELETE CASCADE,
     list_order INTEGER,
     title TEXT,
     region VARCHAR(10),
     language VARCHAR(10),
-    types TEXT,
-    attributes TEXT,
-    is_original_title BOOLEAN,
-    FOREIGN KEY (title_id) REFERENCES title(id) ON DELETE CASCADE
+    types VARCHAR(256),
+    attributes VARCHAR(256),
+    is_original_title BOOLEAN
 );
 
 -- Mana
@@ -96,34 +95,30 @@ CREATE TABLE person_known_for (
 -- Chiara
 CREATE TABLE person_profession (
     person_id VARCHAR(20) REFERENCES person(id) ON DELETE CASCADE,
-    profession TEXT,
+    profession VARCHAR(256),
     PRIMARY KEY (person_id, profession)
 );
 
 -- Chiara
 CREATE TABLE crew (
     -- serial ID could be used for order crediting but I left it as is for now
-    title_id VARCHAR(20),
-    person_id VARCHAR(20),
-    category TEXT,
+    title_id VARCHAR(20) REFERENCES title(id) ON DELETE CASCADE,
+    person_id VARCHAR(20) REFERENCES person(id) ON DELETE CASCADE,
+    category VARCHAR(50),
     job TEXT,
     -- renamed ordering to credit_order to make it more clear
     credit_order INTEGER,
-    PRIMARY KEY (title_id, person_id, category),
-    FOREIGN KEY (title_id) REFERENCES title(id) ON DELETE CASCADE,
-    FOREIGN KEY (person_id) REFERENCES person(id) ON DELETE CASCADE
+    PRIMARY KEY (title_id, person_id, category)
 );
 
 -- Chiara
 CREATE TABLE actor (
-    title_id VARCHAR(20),
-    person_id VARCHAR(20),
+    title_id VARCHAR(20) REFERENCES title(id) ON DELETE CASCADE,
+    person_id VARCHAR(20) REFERENCES person(id) ON DELETE CASCADE,
     character_name TEXT,
     -- renamed ordering to credit_order to make it more clear
     credit_order INTEGER,
-    PRIMARY KEY (title_id, person_id),
-    FOREIGN KEY (title_id) REFERENCES title(id) ON DELETE CASCADE,
-    FOREIGN KEY (person_id) REFERENCES person(id) ON DELETE CASCADE
+    PRIMARY KEY (title_id, person_id)
 );
 
 -- ============================================
@@ -138,9 +133,10 @@ SELECT
     tb.titletype,
     tb.primarytitle,
     tb.originaltitle,
-    (tb.isadult = '1')::BOOLEAN,   -- IMDb stores as '0' or '1'
-    tb.startyear,
-    tb.endyear,
+    tb.isadult,
+    -- NULLIF(NULLIF[...]) catches any form of null values when converting them to INTs, expressed as \N or ''
+    NULLIF(NULLIF(tb.startyear, '\N'), '')::INT,
+    NULLIF(NULLIF(tb.endyear, '\N'), '')::INT,
     tb.runtimeminutes,
     od.poster,
     od.plot
@@ -182,13 +178,13 @@ INSERT INTO also_known_as (title_id, list_order, title, region, language,
                           types, attributes, is_original_title)
 SELECT 
     titleid,
-    ordering::INTEGER,
+    ordering,
     title,
     region,
     language,
     types,
     attributes,
-    isoriginaltitle::BOOLEAN
+    isoriginaltitle
 FROM title_akas
 WHERE titleid IN (SELECT id FROM title);
 
@@ -196,8 +192,8 @@ WHERE titleid IN (SELECT id FROM title);
 INSERT INTO rating (title_id, average_rating, num_votes)
 SELECT 
     tconst,
-    NULLIF(averagerating, '\N')::NUMERIC(3,1),
-    NULLIF(numvotes, '\N')::INT
+    averagerating,
+    numvotes
 FROM title_ratings
 WHERE tconst IN (SELECT id FROM title);
 
@@ -206,8 +202,8 @@ INSERT INTO person (id, primary_name, birth_year, death_year)
 SELECT 
     nconst,
     primaryname,
-    NULLIF(birthyear, '\N')::INT,
-    NULLIF(deathyear, '\N')::INT
+    NULLIF(NULLIF(birthyear, '\N'), '')::INT,
+    NULLIF(NULLIF(deathyear, '\N'), '')::INT
 FROM name_basics;
 
 -- Migrate and normalize person known for titles
@@ -247,55 +243,16 @@ BEGIN
     END LOOP;
 END $$;
 
--- Migrate crew (directors and writers)
--- First, handle directors
-DO $$
-DECLARE
-    rec RECORD;
-    director_item TEXT;
-BEGIN
-    FOR rec IN SELECT tconst, directors FROM title_crew WHERE directors IS NOT NULL
-    LOOP
-        FOREACH director_item IN ARRAY string_to_array(NULLIF(rec.directors, '\N'), ',')
-        LOOP
-            IF EXISTS (SELECT 1 FROM person WHERE id = TRIM(director_item)) 
-               AND EXISTS (SELECT 1 FROM title WHERE id = rec.tconst) THEN
-                INSERT INTO crew (title_id, person_id, category, job, credit_order)
-                VALUES (rec.tconst, TRIM(director_item), 'director', 'Director', NULL)
-                ON CONFLICT (title_id, person_id, category) DO NOTHING;
-            END IF;
-        END LOOP;
-    END LOOP;
-END $$;
+-- Not touching the writers and directors table -> TODO: check that the information in there is actually redundant!
 
--- Handle writers
-DO $$
-DECLARE
-    rec RECORD;
-    writer_item TEXT;
-BEGIN
-    FOR rec IN SELECT tconst, writers FROM title_crew WHERE writers IS NOT NULL
-    LOOP
-        FOREACH writer_item IN ARRAY string_to_array(NULLIF(rec.writers, '\N'), ',')
-        LOOP
-            IF EXISTS (SELECT 1 FROM person WHERE id = TRIM(writer_item)) 
-               AND EXISTS (SELECT 1 FROM title WHERE id = rec.tconst) THEN
-                INSERT INTO crew (title_id, person_id, category, job, credit_order)
-                VALUES (rec.tconst, TRIM(writer_item), 'writer', 'Writer', NULL)
-                ON CONFLICT (title_id, person_id, category) DO NOTHING;
-            END IF;
-        END LOOP;
-    END LOOP;
-END $$;
-
--- Migrate other crew members from title_principals (excluding actors/actresses)
+-- Migrate other crew members from title_principals (excluding actors/actresses, directors and writers are included)
 INSERT INTO crew (title_id, person_id, category, job, credit_order)
 SELECT 
     tp.tconst,
     tp.nconst,
     tp.category,
-    NULLIF(tp.job, '\N'),
-    NULLIF(tp.ordering, '\N')::INT
+    tp.job,
+    tp.ordering
 FROM title_principals tp
 WHERE tp.category NOT IN ('actor', 'actress', 'self')
   AND EXISTS (SELECT 1 FROM person WHERE id = tp.nconst)
@@ -307,8 +264,8 @@ INSERT INTO actor (title_id, person_id, character_name, credit_order)
 SELECT 
     tp.tconst,
     tp.nconst,
-    NULLIF(tp.characters, '\N'),
-    NULLIF(tp.ordering, '\N')::INT
+    tp.characters,
+    tp.ordering
 FROM title_principals tp
 WHERE tp.category IN ('actor', 'actress', 'self')
   AND EXISTS (SELECT 1 FROM person WHERE id = tp.nconst)
@@ -319,14 +276,14 @@ ON CONFLICT (title_id, person_id) DO NOTHING;
 -- STEP 5: DROP SOURCE TABLES
 -- ============================================
 
--- DROP TABLE IF EXISTS title_akas CASCADE;
--- DROP TABLE IF EXISTS title_basics CASCADE;
--- DROP TABLE IF EXISTS title_crew CASCADE;
--- DROP TABLE IF EXISTS title_episode CASCADE;
--- DROP TABLE IF EXISTS title_principals CASCADE;
--- DROP TABLE IF EXISTS title_ratings CASCADE;
--- DROP TABLE IF EXISTS name_basics CASCADE;
--- DROP TABLE IF EXISTS omdb_data CASCADE;
+DROP TABLE IF EXISTS title_akas CASCADE;
+DROP TABLE IF EXISTS title_basics CASCADE;
+DROP TABLE IF EXISTS title_crew CASCADE;
+DROP TABLE IF EXISTS title_episode CASCADE;
+DROP TABLE IF EXISTS title_principals CASCADE;
+DROP TABLE IF EXISTS title_ratings CASCADE;
+DROP TABLE IF EXISTS name_basics CASCADE;
+DROP TABLE IF EXISTS omdb_data CASCADE;
 
 -- ============================================
 -- VERIFICATION QUERIES
