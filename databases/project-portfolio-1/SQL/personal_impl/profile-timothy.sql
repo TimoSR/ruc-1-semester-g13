@@ -101,7 +101,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 
-CREATE OR REPLACE FUNCTION api.search_history(
+CREATE OR REPLACE FUNCTION api.add_search_to_history(
     profile_id UUID,
     query TEXT
 ) RETURNS VOID AS $$
