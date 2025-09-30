@@ -101,7 +101,7 @@ BEGIN
     SELECT profile.account.id,
            profile.account.email,
            profile.account.username,
-           profile.account_id::text::timestamp AS created_at -- adjust if you add a timestamp column
+           profile.account_id::text::timestamp AS created_at
     FROM profile.account
     ORDER BY profile.account.username;
 END;
