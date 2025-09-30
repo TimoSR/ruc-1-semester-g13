@@ -9,7 +9,8 @@ CREATE TABLE profile.account (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email TEXT UNIQUE NOT NULL,
     username TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL
+    password_hash TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT now();
 );
 
 CREATE TABLE profile.bookmark (
@@ -42,31 +43,69 @@ CREATE TABLE profile.rating_history (
 -- FUNCTIONS (API schema)
 -- ============================================
 
-CREATE OR REPLACE FUNCTION api.create_account(
+CREATE OR REPLACE PROCEDURE api.create_account(
     email TEXT,
     username TEXT,
     password_hash TEXT
-) RETURNS UUID AS $$
+)
+LANGUAGE plpgsql
+AS $$
 DECLARE
     new_id UUID;
 BEGIN
     INSERT INTO profile.account (email, username, password_hash)
     VALUES (email, username, password_hash)
     RETURNING id INTO new_id;
+    COMMIT;
 
-    RETURN new_id;
+    RAISE NOTICE 'Created account with id %', new_id;
+
+EXCEPTION WHEN OTHERS THEN
+    ROLLBACK;
+    RAISE EXCEPTION 'Failed to create account: %', SQLERRM;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
-
-CREATE OR REPLACE FUNCTION api.delete_account(
+CREATE OR REPLACE PROCEDURE api.delete_account(
     account_id UUID
-) RETURNS VOID AS $$
+)
+LANGUAGE plpgsql
+AS $$
 BEGIN
     DELETE FROM profile.account WHERE id = account_id;
+
+    IF NOT FOUND THEN
+        ROLLBACK;
+        RAISE EXCEPTION 'Account % does not exist', account_id;
+    END IF;
+
+    COMMIT;
+
+    RAISE NOTICE 'Deleted account %', account_id;
+
+EXCEPTION WHEN OTHERS THEN
+    ROLLBACK;
+    RAISE EXCEPTION 'Failed to delete account %: %', account_id, SQLERRM;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION api.get_accounts()
+RETURNS TABLE(
+    id UUID,
+    email TEXT,
+    username TEXT,
+    created_at TIMESTAMP
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT profile.account.id,
+           profile.account.email,
+           profile.account.username,
+           profile.account_id::text::timestamp AS created_at -- adjust if you add a timestamp column
+    FROM profile.account
+    ORDER BY profile.account.username;
 END;
 $$ LANGUAGE plpgsql;
-
 
 CREATE OR REPLACE FUNCTION api.add_bookmark(
     account_id UUID,
