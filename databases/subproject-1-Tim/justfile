@@ -1,27 +1,88 @@
-import "./terminal-commands/justfile"
-import "./terminal-commands/test2/justfile"
+################################################################
+# 🔧 Environment Configuration
+#
+# Change this to point at the dotenv file you want Just to load.
+# Common choices:
+#   - ".env"        (default/base)
+#   - ".env.local"  (local development)
+#   - ".env.dev"    (development server)
+#   - ".env.prod"   (production)
+################################################################
 
-# Load ENV
-set dotenv-load := true
+set dotenv-filename := ".env.local"
+
+################################################################
+
+# Default: load .env
+set dotenv-load
+
 # Default: use pwsh (PowerShell 7+) for most recipes
 set shell := ["pwsh.exe", "-NoLogo", "-Command"]
+
 # So we don't print the command
 set quiet := true
 
 default:
     just --list
 
-step01_setup:
-    echo "Setup..."
-
-step02_build:
-    echo "Build..."
-
-step03_test:
-    echo "Test..."
-
-step00_simulation: step01_setup step02_build step03_test
-
 # Getting data from env variables
-GetEnvName:
+get-env-name:
 	Write-Output "Hello, ${env:NAME}"
+
+show-env:
+    Write-Output "DB_URL = ${env:DB_URL}"
+    Write-Output "DB_NAME = ${env:DB_NAME}"    
+
+db-create:
+    Write-Output "============================================================"
+    Write-Output "🗑️  Dropping database: ${env:DB_NAME_LOCAL} (if it exists)..."
+    Write-Output "============================================================"
+    psql "${env:DB_URL_LOCAL}" -c "DROP DATABASE IF EXISTS ${env:DB_NAME_LOCAL};"
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    Write-Output ""
+    Write-Output "============================================================"
+    Write-Output "🆕 Creating database: ${env:DB_NAME_LOCAL}"
+    Write-Output "============================================================"
+    psql "${env:DB_URL_LOCAL}" -c "CREATE DATABASE ${env:DB_NAME_LOCAL};"
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    Write-Output ""
+    Write-Output "============================================================"
+    Write-Output "📦 Running migrations from init.sql..."
+    Write-Output "============================================================"
+    psql "${env:DB_URL_LOCAL}" -d ${env:DB_NAME_LOCAL} -f init.sql
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    Write-Output ""
+    Write-Output "============================================================"
+    Write-Output "✅ Database ${env:DB_NAME_LOCAL} is ready 🚀"
+    Write-Output "============================================================"
+
+
+db-reset:
+    Write-Output "---------------------------------------------"
+    Write-Output "🗑️  Dropping database ${env:DB_NAME_LOCAL} (if it exists)..."
+    psql "${env:DB_URL_LOCAL}" -c "DROP DATABASE IF EXISTS ${env:DB_NAME_LOCAL};"
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    Write-Output "---------------------------------------------"
+    Write-Output "✨ Creating fresh database ${env:DB_NAME_LOCAL}..."
+    psql "${env:DB_URL_LOCAL}" -c "CREATE DATABASE ${env:DB_NAME_LOCAL};"
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    Write-Output "---------------------------------------------"
+    Write-Output "📦 Running migrations (init.sql)..."
+    psql "${env:DB_URL_LOCAL}" -d ${env:DB_NAME_LOCAL} -f init.sql
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    Write-Output "---------------------------------------------"
+    Write-Output "✅ Done! Local database ${env:DB_NAME_LOCAL} is ready 🚀"
+
+neondb-reset:
+    psql ${env:DB_URL_ADMIN} -c "DROP DATABASE IF EXISTS ${env:DB_NAME};"
+    psql ${env:DB_URL_ADMIN} -c "CREATE DATABASE ${env:DB_NAME};"
+    psql ${env:DB_URL_ADMIN} -d ${env:DB_NAME} -f init.sql
+
+getTestResults:
+    psql ${env:DB_URL_ADMIN} -d ${env:DB_NAME} -f ./tests/00_test-wrapper.sql

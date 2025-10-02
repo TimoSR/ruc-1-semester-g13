@@ -89,6 +89,13 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
+CREATE OR REPLACE VIEW api.accounts AS
+SELECT id, email, username, created_at
+FROM profile.account;
+
+
+
+
 CREATE OR REPLACE FUNCTION api.get_accounts()
 RETURNS TABLE(
     id UUID,

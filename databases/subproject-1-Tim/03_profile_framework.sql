@@ -108,6 +108,21 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+CREATE OR REPLACE FUNCTION api.get_accounts_page(
+    p_limit INT,
+    p_offset INT
+)
+RETURNS TABLE(id UUID, email TEXT, username TEXT, created_at TIMESTAMP) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT id, email, username, created_at
+    FROM profile.account
+    ORDER BY created_at
+    LIMIT p_limit OFFSET p_offset;
+END;
+$$ LANGUAGE plpgsql;
+
+
 CREATE OR REPLACE FUNCTION api.add_bookmark(
     account_id UUID,
     title_id VARCHAR(20),
