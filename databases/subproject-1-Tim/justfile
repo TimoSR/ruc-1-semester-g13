@@ -13,7 +13,7 @@ set dotenv-load
 #   - ".env.prod"   (production)
 ################################################################
 
-set dotenv-filename := ".env"
+set dotenv-filename := ".env.local"
 
 ################################################################
 
@@ -34,7 +34,7 @@ show-env:
     Write-Output "DB_URL = ${env:DB_URL}"
     Write-Output "DB_NAME = ${env:DB_NAME}"    
 
-db-create:
+localdb-create:
     Write-Output "============================================================"
     Write-Output "🗑️  Dropping database: ${env:DB_NAME} (if it exists)..."
     Write-Output "============================================================"
