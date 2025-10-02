@@ -1,0 +1,27 @@
+import "./terminal-commands/justfile"
+import "./terminal-commands/test2/justfile"
+
+# Load ENV
+set dotenv-load := true
+# Default: use pwsh (PowerShell 7+) for most recipes
+set shell := ["pwsh.exe", "-NoLogo", "-Command"]
+# So we don't print the command
+set quiet := true
+
+default:
+    just --list
+
+step01_setup:
+    echo "Setup..."
+
+step02_build:
+    echo "Build..."
+
+step03_test:
+    echo "Test..."
+
+step00_simulation: step01_setup step02_build step03_test
+
+# Getting data from env variables
+GetEnvName:
+	Write-Output "Hello, ${env:NAME}"

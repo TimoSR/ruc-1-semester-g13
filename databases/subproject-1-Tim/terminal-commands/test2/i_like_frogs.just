@@ -1,0 +1,2 @@
+frogs:
+     @Write-Output "Quak!"

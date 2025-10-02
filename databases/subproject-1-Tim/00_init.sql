@@ -1,2 +1,7 @@
 \i 01_schemas.sql
-\i c2_build_framework_db_Timothy.sql
+\i 02_moviedb_framework.sql
+\i 03_profile_framework.sql
+
+BEGIN TRANSACTION;
+\i ./tests/profile-test.sql
+ROLLBACK TRANSACTION;
