@@ -7,13 +7,13 @@ CREATE TABLE profile.account (
     email TEXT UNIQUE NOT NULL,
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT now();
+    created_at TIMESTAMP DEFAULT now()
 );
 
 CREATE TABLE profile.bookmark (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     account_id UUID NOT NULL REFERENCES profile.account(id) ON DELETE CASCADE,
-    title_id VARCHAR(20) NOT NULL REFERENCES movie_db.title(id) ON DELETE CASCADE,
+    title_id VARCHAR(20) NOT NULL,
     note TEXT,
     added_at TIMESTAMP DEFAULT now(),
     UNIQUE (account_id, title_id)
@@ -29,7 +29,7 @@ CREATE TABLE profile.search_history (
 CREATE TABLE profile.rating_history (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     account_id UUID NOT NULL REFERENCES profile.account(id) ON DELETE CASCADE,
-    title_id VARCHAR(20) NOT NULL REFERENCES movie_db.title(id) ON DELETE CASCADE,
+    title_id VARCHAR(20) NOT NULL,
     rating INT CHECK (rating BETWEEN 1 AND 10),
     comment TEXT,
     created_at TIMESTAMP DEFAULT now(),

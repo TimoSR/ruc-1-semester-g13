@@ -13,7 +13,7 @@ set dotenv-load
 #   - ".env.prod"   (production)
 ################################################################
 
-set dotenv-filename := ".env.local"
+set dotenv-filename := ".env"
 
 ################################################################
 
@@ -59,6 +59,19 @@ db-create:
     Write-Output "============================================================"
     Write-Output "✅ Database ${env:DB_NAME} is ready 🚀"
     Write-Output "============================================================"
+
+neondb-create:
+	Write-Output ""
+	Write-Output "============================================================"
+	Write-Output "📦 Running migrations from init.sql..."
+	Write-Output "============================================================"
+	psql "${env:DB_URL_TARGET}" -f 00_init.sql
+	if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+	Write-Output ""
+	Write-Output "============================================================"
+	Write-Output "✅ Database ${env:DB_NAME} is ready 🚀"
+	Write-Output "============================================================"
 
 
 db-reset:
