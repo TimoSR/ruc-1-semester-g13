@@ -1,3 +1,5 @@
+-- 2
+
 CREATE OR REPLACE FUNCTION string_search(p_profile_id INT, p_query TEXT)
 RETURNS TABLE (tconst VARCHAR(20), primarytitle VARCHAR(500))
 LANGUAGE plpgsql

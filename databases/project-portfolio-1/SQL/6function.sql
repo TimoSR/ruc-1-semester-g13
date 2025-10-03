@@ -1,3 +1,4 @@
+-- 6
 -- 1-D.6 Finding co-players
 
 -- target tables: actor, person (for names)

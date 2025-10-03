@@ -1,3 +1,5 @@
+-- 3
+
 CREATE OR REPLACE FUNCTION rate(p_profile_id INT, p_title_id VARCHAR(20), p_rate INT)
 RETURNS TABLE (title_id VARCHAR(20), average_rating FLOAT, num_votes INT)
 LANGUAGE plpgsql
