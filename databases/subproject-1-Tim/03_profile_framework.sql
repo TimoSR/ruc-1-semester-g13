@@ -1,4 +1,39 @@
 -- ============================================
+-- STEP 1: DROP EXISTING OBJECTS (for repeatability)
+-- ============================================
+
+-- Drop views & functions in api schema
+DROP VIEW IF EXISTS api.accounts CASCADE;
+DROP FUNCTION IF EXISTS api.get_accounts() CASCADE;
+DROP FUNCTION IF EXISTS api.get_accounts_page(INT, INT) CASCADE;
+DROP FUNCTION IF EXISTS api.add_bookmark(UUID, VARCHAR, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS api.get_bookmarks(UUID) CASCADE;
+DROP FUNCTION IF EXISTS api.add_search_to_history(UUID, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS api.search_history(UUID, INT) CASCADE;
+DROP FUNCTION IF EXISTS api.add_rating(UUID, VARCHAR, INT, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS api.get_ratings(UUID) CASCADE;
+DROP PROCEDURE IF EXISTS api.create_account(TEXT, TEXT, TEXT) CASCADE;
+DROP PROCEDURE IF EXISTS api.delete_account(UUID) CASCADE;
+
+-- Drop profile tables
+DROP TABLE IF EXISTS profile.rating_history CASCADE;
+DROP TABLE IF EXISTS profile.search_history CASCADE;
+DROP TABLE IF EXISTS profile.bookmark CASCADE;
+DROP TABLE IF EXISTS profile.account CASCADE;
+
+-- Drop movie_db tables
+DROP TABLE IF EXISTS movie_db.actor CASCADE;
+DROP TABLE IF EXISTS movie_db.crew CASCADE;
+DROP TABLE IF EXISTS movie_db.person_profession CASCADE;
+DROP TABLE IF EXISTS movie_db.person_known_for CASCADE;
+DROP TABLE IF EXISTS movie_db.person CASCADE;
+DROP TABLE IF EXISTS movie_db.rating CASCADE;
+DROP TABLE IF EXISTS movie_db.also_known_as CASCADE;
+DROP TABLE IF EXISTS movie_db.genre CASCADE;
+DROP TABLE IF EXISTS movie_db.episode CASCADE;
+DROP TABLE IF EXISTS movie_db.title CASCADE;
+
+-- ============================================
 -- TABLES
 -- ============================================
 
