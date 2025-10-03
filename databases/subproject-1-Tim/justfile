@@ -26,7 +26,7 @@ set shell := ["pwsh.exe", "-NoLogo", "-Command"]
 set quiet := true
 
 _default:
-    just --list
+	just --list
 
 alias f01 := f01-show-env
 f01-show-env:
@@ -34,42 +34,45 @@ f01-show-env:
 
 alias f02 := f02-show-all-env
 f02-show-all-env:
-    Get-ChildItem Env:
+	Get-ChildItem Env:
 
 alias f1 := f1-createDB-with-drop
 # Only works with dotenv-filename = .env.local
 [doc]
 f1-createDB-with-drop:
-    Write-Output "============================================================"
-    Write-Output "🗑️  Dropping database: ${env:DB_NAME} (if it exists)..."
-    Write-Output "============================================================"
-    psql ${env:DB_URL} -c "DROP DATABASE IF EXISTS ${env:DB_NAME};"
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+	Write-Output "============================================================"
+	Write-Output "🗑️  Dropping database: ${env:DB_NAME} (if it exists)..."
+	Write-Output "============================================================"
+	psql ${env:DB_URL} -c "DROP DATABASE IF EXISTS ${env:DB_NAME};"
+	if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-    Write-Output "============================================================"
-    Write-Output "🆕 Creating database: ${env:DB_NAME}"
-    Write-Output "============================================================"
-    psql ${env:DB_URL} -c "CREATE DATABASE ${env:DB_NAME};"
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+	Write-Output "============================================================"
+	Write-Output "🆕 Creating database: ${env:DB_NAME}"
+	Write-Output "============================================================"
+	psql ${env:DB_URL} -c "CREATE DATABASE ${env:DB_NAME};"
+	if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-    Write-Output "============================================================"
-    Write-Output "📦 Running migrations from init.sql..."
-    Write-Output "============================================================"
-    psql ${env:DB_URL} -f 00_init.sql
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+	Write-Output "============================================================"
+	Write-Output "📦 Running migrations from init.sql..."
+	Write-Output "============================================================"
+	psql ${env:DB_URL} -f 00_init.sql
+	if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-    Write-Output "============================================================"
-    Write-Output "✅ Database ${env:DB_NAME} is ready 🚀"
-    Write-Output "============================================================"
+	Write-Output "============================================================"
+	Write-Output "🚀 Database ${env:DB_NAME} is ready 🚀"
+	Write-Output "============================================================"
 
 alias f2 := f2-run-db-tests
 # Only works with dotenv-filename = .env.local4
 [doc]
 f2-run-db-tests:
 	@Write-Output "============================================================"
-	@Write-Output "🧪 Running tests on ${env:DB_NAME}..."
+	@Write-Output "🧪 Running tests on ${env:DB_NAME} 🧪"
 	@Write-Output "============================================================"
 	psql ${env:DB_URL} -a -f 00_tests.sql > cit${env:GROUP_NUMBER}-${env:PROJECT_NAME}.txt 2>&1
+	@Write-Output "============================================================"
+	@Write-Output "✅ Tests completed successfully ✅"
+	@Write-Output "============================================================"
 
 alias f3 := f3-createDB-no-drop
 # Create an .env file with variable DB_URL_TARGET

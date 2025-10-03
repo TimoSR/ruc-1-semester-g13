@@ -5,7 +5,6 @@
 -- Drop views & functions in api schema
 DROP VIEW IF EXISTS api.accounts CASCADE;
 DROP FUNCTION IF EXISTS api.get_accounts() CASCADE;
-DROP FUNCTION IF EXISTS api.get_accounts_page(INT, INT) CASCADE;
 DROP FUNCTION IF EXISTS api.add_bookmark(UUID, VARCHAR, TEXT) CASCADE;
 DROP FUNCTION IF EXISTS api.get_bookmarks(UUID) CASCADE;
 DROP FUNCTION IF EXISTS api.add_search_to_history(UUID, TEXT) CASCADE;
@@ -21,239 +20,245 @@ DROP TABLE IF EXISTS profile.search_history CASCADE;
 DROP TABLE IF EXISTS profile.bookmark CASCADE;
 DROP TABLE IF EXISTS profile.account CASCADE;
 
--- Drop movie_db tables
-DROP TABLE IF EXISTS movie_db.actor CASCADE;
-DROP TABLE IF EXISTS movie_db.crew CASCADE;
-DROP TABLE IF EXISTS movie_db.person_profession CASCADE;
-DROP TABLE IF EXISTS movie_db.person_known_for CASCADE;
-DROP TABLE IF EXISTS movie_db.person CASCADE;
-DROP TABLE IF EXISTS movie_db.rating CASCADE;
-DROP TABLE IF EXISTS movie_db.also_known_as CASCADE;
-DROP TABLE IF EXISTS movie_db.genre CASCADE;
-DROP TABLE IF EXISTS movie_db.episode CASCADE;
-DROP TABLE IF EXISTS movie_db.title CASCADE;
-
 -- ============================================
 -- TABLES
 -- ============================================
 
 CREATE TABLE profile.account (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email TEXT UNIQUE NOT NULL,
-    username TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT now()
+	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	email TEXT UNIQUE NOT NULL,
+	username TEXT UNIQUE NOT NULL,
+	password_hash TEXT NOT NULL,
+	created_at TIMESTAMP DEFAULT now()
 );
 
 CREATE TABLE profile.bookmark (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    account_id UUID NOT NULL REFERENCES profile.account(id) ON DELETE CASCADE,
-    title_id VARCHAR(20) NOT NULL,
-    note TEXT,
-    added_at TIMESTAMP DEFAULT now(),
-    UNIQUE (account_id, title_id)
+	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	account_id UUID NOT NULL REFERENCES profile.account(id) ON DELETE CASCADE,
+	title_id VARCHAR(20) NOT NULL,
+	note TEXT,
+	added_at TIMESTAMP DEFAULT now(),
+	UNIQUE (account_id, title_id)
 );
 
 CREATE TABLE profile.search_history (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    account_id UUID NOT NULL REFERENCES profile.account(id) ON DELETE CASCADE,
-    search_query TEXT NOT NULL,
-    searched_at TIMESTAMP DEFAULT now()
+	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	account_id UUID NOT NULL REFERENCES profile.account(id) ON DELETE CASCADE,
+	search_query TEXT NOT NULL,
+	searched_at TIMESTAMP DEFAULT now()
 );
 
 CREATE TABLE profile.rating_history (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    account_id UUID NOT NULL REFERENCES profile.account(id) ON DELETE CASCADE,
-    title_id VARCHAR(20) NOT NULL,
-    rating INT CHECK (rating BETWEEN 1 AND 10),
-    comment TEXT,
-    created_at TIMESTAMP DEFAULT now(),
-    UNIQUE (account_id, title_id)
+	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	account_id UUID NOT NULL REFERENCES profile.account(id) ON DELETE CASCADE,
+	title_id VARCHAR(20) NOT NULL,
+	rating INT CHECK (rating BETWEEN 1 AND 10),
+	comment TEXT,
+	created_at TIMESTAMP DEFAULT now(),
+	UNIQUE (account_id, title_id)
 );
 
 -- ============================================
 -- FUNCTIONS (API schema)
 -- ============================================
 
+-- =========================================================
+-- ACCOUNT PROCEDURES
+-- =========================================================
+
 CREATE OR REPLACE PROCEDURE api.create_account(
-    email TEXT,
-    username TEXT,
-    password_hash TEXT
+	p_email TEXT,
+	p_username TEXT,
+	p_password_hash TEXT
 )
 LANGUAGE plpgsql
 AS $$
 DECLARE
-    new_id UUID;
+	new_id UUID;
 BEGIN
-    INSERT INTO profile.account (email, username, password_hash)
-    VALUES (email, username, password_hash)
-    RETURNING id INTO new_id;
-    COMMIT;
+	INSERT INTO profile.account (email, username, password_hash)
+	VALUES (p_email, p_username, p_password_hash)
+	RETURNING id INTO new_id;
 
-    RAISE NOTICE 'Created account with id %', new_id;
-
-EXCEPTION WHEN OTHERS THEN
-    ROLLBACK;
-    RAISE EXCEPTION 'Failed to create account: %', SQLERRM;
+	RAISE NOTICE 'Created account with id %', new_id;
 END;
 $$;
 
 CREATE OR REPLACE PROCEDURE api.delete_account(
-    account_id UUID
+	p_account_id UUID
 )
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    DELETE FROM profile.account WHERE id = account_id;
+	DELETE FROM profile.account WHERE id = p_account_id;
 
-    IF NOT FOUND THEN
-        ROLLBACK;
-        RAISE EXCEPTION 'Account % does not exist', account_id;
-    END IF;
+	IF NOT FOUND THEN
+		RAISE EXCEPTION 'Account % does not exist', p_account_id;
+	END IF;
 
-    COMMIT;
-
-    RAISE NOTICE 'Deleted account %', account_id;
-
-EXCEPTION WHEN OTHERS THEN
-    ROLLBACK;
-    RAISE EXCEPTION 'Failed to delete account %: %', account_id, SQLERRM;
+	RAISE NOTICE 'Deleted account %', p_account_id;
 END;
 $$;
 
-CREATE OR REPLACE VIEW api.accounts AS
-SELECT id, email, username, created_at
-FROM profile.account;
-
-CREATE OR REPLACE FUNCTION api.get_accounts()
-RETURNS TABLE(
-    id UUID,
-    email TEXT,
-    username TEXT,
-    created_at TIMESTAMP
-) AS $$
+CREATE OR REPLACE FUNCTION api.get_account_info(p_id UUID)
+RETURNS TABLE(id UUID, email TEXT, username TEXT, created_at TIMESTAMP) 
+AS $$
 BEGIN
-    RETURN QUERY
-    SELECT profile.account.id,
-           profile.account.email,
-           profile.account.username,
-           profile.account_id::text::timestamp AS created_at
-    FROM profile.account
-    ORDER BY profile.account.username;
+	RETURN QUERY
+	SELECT a.id,
+		   a.email,
+		   a.username,
+		   a.created_at
+	FROM profile.account a
+	WHERE a.id = p_id;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION api.get_accounts_page(
-    p_limit INT,
-    p_offset INT
+CREATE OR REPLACE VIEW api.get_all_accounts AS
+SELECT a.id,
+	   a.email,
+	   a.username,
+	   a.created_at
+FROM profile.account a;
+
+CREATE OR REPLACE FUNCTION api.get_accounts(
+	p_limit INT DEFAULT 50,
+	p_offset INT DEFAULT 0
 )
-RETURNS TABLE(id UUID, email TEXT, username TEXT, created_at TIMESTAMP) AS $$
+RETURNS TABLE(id UUID, email TEXT, username TEXT, created_at TIMESTAMP) 
+AS $$
 BEGIN
-    RETURN QUERY
-    SELECT id, email, username, created_at
-    FROM profile.account
-    ORDER BY created_at
-    LIMIT p_limit OFFSET p_offset;
+	RETURN QUERY
+	SELECT a.id,
+		   a.email,
+		   a.username,
+		   a.created_at
+	FROM profile.account a
+	ORDER BY a.created_at DESC
+	LIMIT p_limit OFFSET p_offset;
 END;
 $$ LANGUAGE plpgsql;
 
+-- =========================================================
+-- BOOKMARKS
+-- =========================================================
 
 CREATE OR REPLACE FUNCTION api.add_bookmark(
-    p_account_id UUID,
-    p_title_id VARCHAR(20),
-    p_note TEXT DEFAULT NULL
+	p_account_id UUID,
+	p_title_id VARCHAR(20),
+	p_note TEXT DEFAULT NULL
 ) RETURNS VOID AS $$
 BEGIN
-    INSERT INTO profile.bookmark (account_id, title_id, note)
-    VALUES (p_account_id, p_title_id, p_note)
-    ON CONFLICT (account_id, title_id)
-    DO UPDATE SET note = EXCLUDED.note, added_at = now();
+	INSERT INTO profile.bookmark (account_id, title_id, note)
+	VALUES (p_account_id, p_title_id, p_note)
+	ON CONFLICT (account_id, title_id)
+	DO UPDATE SET note = EXCLUDED.note, added_at = now();
 END;
 $$ LANGUAGE plpgsql;
-
 
 CREATE OR REPLACE FUNCTION api.get_bookmarks(
-    account_id UUID
+	p_account_id UUID,
+	p_limit INT DEFAULT 50,
+	p_offset INT DEFAULT 0
 ) RETURNS TABLE(
-    title_id VARCHAR(20),
-    note TEXT,
-    added_at TIMESTAMP
+	title_id VARCHAR(20),
+	note TEXT,
+	added_at TIMESTAMP
 ) AS $$
 BEGIN
-    RETURN QUERY
-    SELECT profile.bookmark.title_id,
-           profile.bookmark.note,
-           profile.bookmark.added_at
-    FROM profile.bookmark
-    WHERE profile.bookmark.account_id = account_id
-    ORDER BY profile.bookmark.added_at DESC;
+	RETURN QUERY
+	SELECT b.title_id,
+		   b.note,
+		   b.added_at
+	FROM profile.bookmark b
+	WHERE b.account_id = p_account_id
+	ORDER BY b.added_at DESC
+	LIMIT p_limit OFFSET p_offset;
 END;
 $$ LANGUAGE plpgsql;
 
+
+-- =========================================================
+-- SEARCH HISTORY
+-- =========================================================
 
 CREATE OR REPLACE FUNCTION api.add_search_to_history(
-    account_id UUID,
-    query TEXT
+	p_account_id UUID,
+	p_query TEXT
 ) RETURNS VOID AS $$
 BEGIN
-    INSERT INTO profile.search_history (account_id, search_query)
-    VALUES (account_id, query);
+	INSERT INTO profile.search_history (account_id, search_query)
+	VALUES (p_account_id, p_query);
 END;
 $$ LANGUAGE plpgsql;
 
 
-CREATE OR REPLACE FUNCTION api.search_history(
-    account_id UUID,
-    limit_rows INT DEFAULT 10
+CREATE OR REPLACE FUNCTION api.get_search_history(
+	p_account_id UUID,
+	p_limit INT DEFAULT 50,
+	p_offset INT DEFAULT 0
 ) RETURNS TABLE(
-    query TEXT,
-    searched_at TIMESTAMP
+	query TEXT,
+	searched_at TIMESTAMP
 ) AS $$
 BEGIN
-    RETURN QUERY
-    SELECT profile.search_history.search_query,
-           profile.search_history.searched_at
-    FROM profile.search_history
-    WHERE profile.search_history.account_id = account_id
-    ORDER BY profile.search_history.searched_at DESC
-    LIMIT limit_rows;
+	RETURN QUERY
+	SELECT sh.search_query,
+		   sh.searched_at
+	FROM profile.search_history sh
+	WHERE sh.account_id = p_account_id
+	ORDER BY sh.searched_at DESC
+	LIMIT p_limit OFFSET p_offset;
 END;
 $$ LANGUAGE plpgsql;
 
+
+-- =========================================================
+-- RATINGS (already fixed before)
+-- =========================================================
 
 CREATE OR REPLACE FUNCTION api.add_rating(
-    account_id UUID,
-    title_id VARCHAR(20),
-    rating INT,
-    comment TEXT DEFAULT NULL
+	p_account_id UUID,
+	p_title_id   VARCHAR(20),
+	p_rating     INT,
+	p_comment    TEXT DEFAULT NULL
 ) RETURNS VOID AS $$
 BEGIN
-    INSERT INTO profile.rating_history (account_id, title_id, rating, comment)
-    VALUES (account_id, title_id, rating, comment)
-    ON CONFLICT (account_id, title_id)
-    DO UPDATE SET rating = EXCLUDED.rating,
-                  comment = EXCLUDED.comment,
-                  created_at = now();
+	INSERT INTO profile.rating_history (account_id, title_id, rating, comment)
+	VALUES (p_account_id, p_title_id, p_rating, p_comment)
+	ON CONFLICT (account_id, title_id)
+	DO UPDATE SET 
+		rating     = EXCLUDED.rating,
+		comment    = EXCLUDED.comment,
+		created_at = now();
 END;
 $$ LANGUAGE plpgsql;
 
 
-CREATE OR REPLACE FUNCTION api.get_ratings(
-    account_id UUID
+CREATE OR REPLACE FUNCTION api.get_ratings_by_account_id(
+	p_account_id UUID,
+	p_limit INT DEFAULT 50,
+	p_offset INT DEFAULT 0
 ) RETURNS TABLE(
-    title_id VARCHAR(20),
-    rating INT,
-    comment TEXT,
-    created_at TIMESTAMP
+	title_id VARCHAR(20),
+	rating INT,
+	comment TEXT,
+	created_at TIMESTAMP
 ) AS $$
 BEGIN
-    RETURN QUERY
-    SELECT profile.rating_history.title_id,
-           profile.rating_history.rating,
-           profile.rating_history.comment,
-           profile.rating_history.created_at
-    FROM profile.rating_history
-    WHERE profile.rating_history.account_id = account_id
-    ORDER BY profile.rating_history.created_at DESC;
+	RETURN QUERY
+	SELECT rh.title_id,
+		   rh.rating,
+		   rh.comment,
+		   rh.created_at
+	FROM profile.rating_history rh
+	WHERE rh.account_id = p_account_id
+	ORDER BY rh.created_at DESC
+	LIMIT p_limit OFFSET p_offset;
 END;
 $$ LANGUAGE plpgsql;
+
+CREATE MATERIALIZED VIEW api.title_avg_ratings AS
+SELECT title_id, AVG(rating) AS avg_rating, COUNT(*) AS num_ratings
+FROM profile.rating_history
+GROUP BY title_id;
