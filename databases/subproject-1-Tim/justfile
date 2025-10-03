@@ -46,21 +46,18 @@ f1-create-localdb:
     psql ${env:DB_URL} -c "DROP DATABASE IF EXISTS ${env:DB_NAME};"
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-    Write-Output ""
     Write-Output "============================================================"
     Write-Output "🆕 Creating database: ${env:DB_NAME}"
     Write-Output "============================================================"
     psql ${env:DB_URL} -c "CREATE DATABASE ${env:DB_NAME};"
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-    Write-Output ""
     Write-Output "============================================================"
     Write-Output "📦 Running migrations from init.sql..."
     Write-Output "============================================================"
     psql ${env:DB_URL} -f 00_init.sql
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-    Write-Output ""
     Write-Output "============================================================"
     Write-Output "✅ Database ${env:DB_NAME} is ready 🚀"
     Write-Output "============================================================"
@@ -69,6 +66,9 @@ alias f2 := f2-test-localdb
 # Only works with dotenv-filename = .env.local4
 [doc]
 f2-test-localdb:
+	@Write-Output "============================================================"
+	@Write-Output "🧪 Running tests on ${env:DB_NAME}..."
+	@Write-Output "============================================================"
 	psql ${env:DB_URL} -a -f 00_tests.sql > cit${env:GROUP_NUMBER}-${env:PROJECT_NAME}.txt 2>&1
 
 alias f3 := f3-neondb-create
@@ -86,6 +86,10 @@ f3-neondb-create:
 	Write-Output "============================================================"
 	Write-Output "✅ Database ${env:DB_NAME} is ready 🚀"
 	Write-Output "============================================================"
+
+alias f4 := f4-run-full-pipeline
+f4-run-full-pipeline: f1-create-localdb f2-test-localdb
+
 
 getTestResults:
     psql ${env:DB_URL_ADMIN} -d ${env:DB_NAME} -f ./tests/00_test-wrapper.sql
