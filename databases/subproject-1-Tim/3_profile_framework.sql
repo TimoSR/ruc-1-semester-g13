@@ -25,37 +25,46 @@ DROP TABLE IF EXISTS profile.account CASCADE;
 -- ============================================
 
 CREATE TABLE profile.account (
-	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-	email TEXT UNIQUE NOT NULL,
-	username TEXT UNIQUE NOT NULL,
-	password_hash TEXT NOT NULL,
-	created_at TIMESTAMP DEFAULT now()
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email TEXT UNIQUE NOT NULL,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT now()
 );
 
-CREATE TABLE profile.bookmark (
-	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-	account_id UUID NOT NULL REFERENCES profile.account(id) ON DELETE CASCADE,
-	title_id VARCHAR(20) NOT NULL,
-	note TEXT,
-	added_at TIMESTAMP DEFAULT now(),
-	UNIQUE (account_id, title_id)
+CREATE TABLE profile.bookmark_title (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    account_id UUID NOT NULL REFERENCES profile.account(id) ON DELETE CASCADE,
+    title_id UUID NOT NULL,
+    note TEXT,
+    added_at TIMESTAMP DEFAULT now(),
+    UNIQUE (account_id, title_id)
+);
+
+CREATE TABLE profile.bookmark_person (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    account_id UUID NOT NULL REFERENCES profile.account(id) ON DELETE CASCADE,
+    person_id UUID NOT NULL,
+    note TEXT,
+    added_at TIMESTAMP DEFAULT now(),
+    UNIQUE (account_id, person_id)
 );
 
 CREATE TABLE profile.search_history (
-	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-	account_id UUID NOT NULL REFERENCES profile.account(id) ON DELETE CASCADE,
-	search_query TEXT NOT NULL,
-	searched_at TIMESTAMP DEFAULT now()
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    account_id UUID NOT NULL REFERENCES profile.account(id) ON DELETE CASCADE,
+    search_query TEXT NOT NULL,
+    searched_at TIMESTAMP DEFAULT now()
 );
 
 CREATE TABLE profile.rating_history (
-	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-	account_id UUID NOT NULL REFERENCES profile.account(id) ON DELETE CASCADE,
-	title_id VARCHAR(20) NOT NULL,
-	rating INT CHECK (rating BETWEEN 1 AND 10),
-	comment TEXT,
-	created_at TIMESTAMP DEFAULT now(),
-	UNIQUE (account_id, title_id)
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    account_id UUID NOT NULL REFERENCES profile.account(id) ON DELETE CASCADE,
+    title_id UUID NOT NULL,
+    rating INT CHECK (rating BETWEEN 1 AND 10),
+    comment TEXT,
+    created_at TIMESTAMP DEFAULT now(),
+    UNIQUE (account_id, title_id)
 );
 
 -- ============================================
@@ -156,27 +165,53 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+CREATE TYPE bookmark_target AS ENUM ('all', 'title', 'person');
+
 CREATE OR REPLACE FUNCTION api.get_bookmarks(
-	p_account_id UUID,
-	p_limit INT DEFAULT 50,
-	p_offset INT DEFAULT 0
+    p_account_id UUID,
+    e_type bookmark_target DEFAULT 'all',
+    p_limit INT DEFAULT 50,
+    p_offset INT DEFAULT 0
 ) RETURNS TABLE(
-	title_id VARCHAR(20),
-	note TEXT,
-	added_at TIMESTAMP
+    target_id UUID,
+    target_type TEXT,
+    note TEXT,
+    added_at TIMESTAMP
 ) AS $$
 BEGIN
-	RETURN QUERY
-	SELECT b.title_id,
-		   b.note,
-		   b.added_at
-	FROM profile.bookmark b
-	WHERE b.account_id = p_account_id
-	ORDER BY b.added_at DESC
-	LIMIT p_limit OFFSET p_offset;
+    IF e_type = 'title' THEN
+        RETURN QUERY
+        SELECT b.title_id, 'title'::TEXT, b.note, b.added_at
+        FROM profile.bookmark_title b
+        WHERE b.account_id = p_account_id
+        ORDER BY b.added_at DESC
+        LIMIT p_limit OFFSET p_offset;
+
+    ELSIF e_type = 'person' THEN
+        RETURN QUERY
+        SELECT b.person_id, 'person'::TEXT, b.note, b.added_at
+        FROM profile.bookmark_person b
+        WHERE b.account_id = p_account_id
+        ORDER BY b.added_at DESC
+        LIMIT p_limit OFFSET p_offset;
+
+    ELSE -- e_type = 'all'
+        RETURN QUERY
+        SELECT b.title_id, 'title'::TEXT, b.note, b.added_at
+        FROM profile.bookmark_title b
+        WHERE b.account_id = p_account_id
+
+        UNION ALL
+
+        SELECT b.person_id, 'person'::TEXT, b.note, b.added_at
+        FROM profile.bookmark_person b
+        WHERE b.account_id = p_account_id
+
+        ORDER BY added_at DESC
+        LIMIT p_limit OFFSET p_offset;
+    END IF;
 END;
 $$ LANGUAGE plpgsql;
-
 
 -- =========================================================
 -- SEARCH HISTORY
