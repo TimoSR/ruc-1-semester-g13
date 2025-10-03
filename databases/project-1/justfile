@@ -7,6 +7,7 @@ set dotenv-load := true
 set shell := ["pwsh.exe", "-NoLogo", "-Command"]
 # So we don't print the command
 set quiet := true
+# to hide something use [private] or _
 
 default:
     just --list

@@ -124,13 +124,13 @@ $$ LANGUAGE plpgsql;
 
 
 CREATE OR REPLACE FUNCTION api.add_bookmark(
-    account_id UUID,
-    title_id VARCHAR(20),
-    note TEXT DEFAULT NULL
+    p_account_id UUID,
+    p_title_id VARCHAR(20),
+    p_note TEXT DEFAULT NULL
 ) RETURNS VOID AS $$
 BEGIN
     INSERT INTO profile.bookmark (account_id, title_id, note)
-    VALUES (account_id, title_id, note)
+    VALUES (p_account_id, p_title_id, p_note)
     ON CONFLICT (account_id, title_id)
     DO UPDATE SET note = EXCLUDED.note, added_at = now();
 END;

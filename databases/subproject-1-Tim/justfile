@@ -23,9 +23,11 @@ set shell := ["pwsh.exe", "-NoLogo", "-Command"]
 # So we don't print the command
 set quiet := true
 
-default:
+_default:
     just --list
 
+@hidden-helper:
+    Write-Output "this won’t show in just --list"
 
 get-env-name:
 	Write-Output "Hello, ${env:NAME}"
@@ -34,26 +36,28 @@ show-env:
     Write-Output "DB_URL = ${env:DB_URL}"
     Write-Output "DB_NAME = ${env:DB_NAME}"    
 
-# Only works if you set the .env.local
+alias f1 := f1-create-localdb
+# Only works with dotenv-filename = .env.local
+[doc]
 f1-create-localdb:
     Write-Output "============================================================"
     Write-Output "🗑️  Dropping database: ${env:DB_NAME} (if it exists)..."
     Write-Output "============================================================"
-    psql "${env:DB_URL}" -c "DROP DATABASE IF EXISTS ${env:DB_NAME};"
+    psql ${env:DB_URL} -c "DROP DATABASE IF EXISTS ${env:DB_NAME};"
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     Write-Output ""
     Write-Output "============================================================"
     Write-Output "🆕 Creating database: ${env:DB_NAME}"
     Write-Output "============================================================"
-    psql "${env:DB_URL}" -c "CREATE DATABASE ${env:DB_NAME};"
+    psql ${env:DB_URL} -c "CREATE DATABASE ${env:DB_NAME};"
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     Write-Output ""
     Write-Output "============================================================"
     Write-Output "📦 Running migrations from init.sql..."
     Write-Output "============================================================"
-    psql "${env:DB_URL}" -f 00_init.sql
+    psql ${env:DB_URL} -f 00_init.sql
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     Write-Output ""
@@ -61,11 +65,16 @@ f1-create-localdb:
     Write-Output "✅ Database ${env:DB_NAME} is ready 🚀"
     Write-Output "============================================================"
 
+alias f2 := f2-test-localdb
+# Only works with dotenv-filename = .env.local4
+[doc]
 f2-test-localdb:
-	psql "${env:DB_URL}" -a -f 00_tests.sql > cit"${env:GROUP_NUMBER}"-"${env:PROJECT_NAME}".txt 2>&1
+	psql ${env:DB_URL} -a -f 00_tests.sql > cit${env:GROUP_NUMBER}-${env:PROJECT_NAME}.txt 2>&1
 
-# Create an .env file with variables [DB_URL_TARGET]
-neondb-create:
+alias f3 := f3-neondb-create
+# Create an .env file with variable DB_URL_TARGET
+[doc]
+f3-neondb-create:
 	Write-Output ""
 	Write-Output "============================================================"
 	Write-Output "📦 Running migrations from init.sql..."
