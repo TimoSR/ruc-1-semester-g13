@@ -34,8 +34,8 @@ show-env:
     Write-Output "DB_URL = ${env:DB_URL}"
     Write-Output "DB_NAME = ${env:DB_NAME}"    
 
-# Only works with .env.local
-localdb-create:
+# Only works if you set the .env.local
+f1-create-localdb:
     Write-Output "============================================================"
     Write-Output "🗑️  Dropping database: ${env:DB_NAME} (if it exists)..."
     Write-Output "============================================================"
@@ -60,6 +60,9 @@ localdb-create:
     Write-Output "============================================================"
     Write-Output "✅ Database ${env:DB_NAME} is ready 🚀"
     Write-Output "============================================================"
+
+f2-test-localdb:
+	psql "${env:DB_URL}" -a -f 00_tests.sql > cit"${env:GROUP_NUMBER}"-"${env:PROJECT_NAME}".txt 2>&1
 
 # Create an .env file with variables [DB_URL_TARGET]
 neondb-create:

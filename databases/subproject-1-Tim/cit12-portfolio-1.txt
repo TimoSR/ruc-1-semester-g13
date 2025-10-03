@@ -1,0 +1,78 @@
+\set ON_ERROR_STOP on
+
+
+
+BEGIN;
+
+BEGIN
+\i ./tests/moviedb-test.sql
+
+-- ============================================
+
+-- VERIFICATION QUERIES
+
+-- ============================================
+
+SELECT 'Titles migrated:' AS info, COUNT(*) AS count FROM movie_db.title;
+
+       info       | count 
+------------------+-------
+ Titles migrated: |     0
+(1 row)
+
+SELECT 'Episodes migrated:' AS info, COUNT(*) AS count FROM movie_db.episode;
+
+        info        | count 
+--------------------+-------
+ Episodes migrated: |     0
+(1 row)
+
+SELECT 'Genres migrated:' AS info, COUNT(*) AS count FROM movie_db.genre;
+
+       info       | count 
+------------------+-------
+ Genres migrated: |     0
+(1 row)
+
+SELECT 'Ratings migrated:' AS info, COUNT(*) AS count FROM movie_db.rating;
+
+       info        | count 
+-------------------+-------
+ Ratings migrated: |     0
+(1 row)
+
+SELECT 'Persons migrated:' AS info, COUNT(*) AS count FROM movie_db.person;
+
+       info        | count 
+-------------------+-------
+ Persons migrated: |     0
+(1 row)
+
+SELECT 'Actors migrated:' AS info, COUNT(*) AS count FROM movie_db.actor;
+
+       info       | count 
+------------------+-------
+ Actors migrated: |     0
+(1 row)
+
+SELECT 'Crew migrated:' AS info, COUNT(*) AS count FROM movie_db.crew;
+      info      | count 
+----------------+-------
+ Crew migrated: |     0
+(1 row)
+
+\i ./tests/profile-test.sql
+
+-- ============================================
+
+-- Testing API schema
+
+-- ============================================
+
+
+
+SELECT api.add_bookmark('uuid-of-alice', 'tt0001', 'Loved this movie');
+
+psql:tests/profile-test.sql:5: ERROR:  invalid input syntax for type uuid: "uuid-of-alice"
+LINE 1: SELECT api.add_bookmark('uuid-of-alice', 'tt0001', 'Loved th...
+                                ^
