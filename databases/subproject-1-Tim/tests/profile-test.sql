@@ -43,48 +43,92 @@ SELECT * FROM api.get_accounts(2, 0);
 -- Next page
 SELECT * FROM api.get_accounts(2, 2);
 
--- ============================================
--- TEST BOOKMARKS
--- ============================================
+-- ============================================================
+-- TESTING BOOKMARKS (Titles + Persons)
+-- ============================================================
 
--- Add bookmark for Alice
-SELECT api.add_bookmark('11111111-1111-1111-1111-111111111111', 'tt0001', 'Great movie');
+-- Add a title bookmark for Alice
+SELECT api.add_bookmark(
+  '11111111-1111-1111-1111-111111111111'::uuid, -- account_id
+  '11111111-2222-3333-4444-555555555555'::uuid, -- title_id
+  'title'::bookmark_target,
+  'Great movie'::text
+);
 
--- Update same bookmark (note changes via UPSERT)
-SELECT api.add_bookmark('11111111-1111-1111-1111-111111111111', 'tt0001', 'Changed my mind');
+-- Update the same title bookmark (UPSERT behaviour)
+SELECT api.add_bookmark(
+  '11111111-1111-1111-1111-111111111111'::uuid,
+  '11111111-2222-3333-4444-555555555555'::uuid,
+  'title'::bookmark_target,
+  'Changed my mind'::text
+);
 
--- Add multiple bookmarks
-SELECT api.add_bookmark('11111111-1111-1111-1111-111111111111', 'tt0002', 'Also good');
+-- Add another title bookmark
+SELECT api.add_bookmark(
+  '11111111-1111-1111-1111-111111111111'::uuid,
+  '66666666-7777-8888-9999-000000000000'::uuid,
+  'title'::bookmark_target,
+  'Also good'::text
+);
 
--- Get Alice’s bookmarks
-SELECT * FROM api.get_bookmarks('11111111-1111-1111-1111-111111111111', 10, 0);
+-- Add a person bookmark
+SELECT api.add_bookmark(
+  '11111111-1111-1111-1111-111111111111'::uuid,
+  'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'::uuid,
+  'person'::bookmark_target,
+  'One of my favourite actors'::text
+);
+
+-- Get bookmarks (examples)
+SELECT * FROM api.get_bookmarks('11111111-1111-1111-1111-111111111111'::uuid);
+SELECT * FROM api.get_bookmarks('11111111-1111-1111-1111-111111111111'::uuid, 'title'::bookmark_target);
+SELECT * FROM api.get_bookmarks('11111111-1111-1111-1111-111111111111'::uuid, 'person'::bookmark_target);
 
 -- ============================================
 -- TEST SEARCH HISTORY
 -- ============================================
 
 -- Add searches
-SELECT api.add_search_to_history('11111111-1111-1111-1111-111111111111', 'matrix');
-SELECT api.add_search_to_history('11111111-1111-1111-1111-111111111111', 'star wars');
-
+SELECT api.add_search_to_history('11111111-1111-1111-1111-111111111111'::uuid, 'matrix');
+SELECT api.add_search_to_history('11111111-1111-1111-1111-111111111111'::uuid, 'harry potter');
 -- Get Alice’s searches (limit 5)
-SELECT * FROM api.get_search_history('11111111-1111-1111-1111-111111111111', 5, 0);
+SELECT * FROM api.get_search_history('11111111-1111-1111-1111-111111111111'::uuid, 5, 0);
 
 -- ============================================
 -- TEST RATINGS
 -- ============================================
 
 -- Add rating for Alice
-SELECT api.add_rating('11111111-1111-1111-1111-111111111111', 'tt0001', 8, 'Pretty good');
+SELECT api.add_rating(
+  '11111111-1111-1111-1111-111111111111'::uuid,
+  '22222222-3333-4444-5555-666666666666'::uuid, -- UUID for a title
+  8,
+  'Pretty good'
+);
 
 -- Update same rating
-SELECT api.add_rating('11111111-1111-1111-1111-111111111111', 'tt0001', 9, 'Even better');
+SELECT api.add_rating(
+  '11111111-1111-1111-1111-111111111111'::uuid,
+  '22222222-3333-4444-5555-666666666666'::uuid,
+  9,
+  'Even better'
+);
 
 -- Add another rating
-SELECT api.add_rating('11111111-1111-1111-1111-111111111111', 'tt0002', 5, 'Meh');
+SELECT api.add_rating(
+  '11111111-1111-1111-1111-111111111111'::uuid,
+  '77777777-8888-9999-0000-aaaaaaaaaaaa'::uuid, -- another title UUID
+  5,
+  'Meh'
+);
 
 -- Get Alice’s ratings
-SELECT * FROM api.get_ratings_by_account_id('11111111-1111-1111-1111-111111111111', 10, 0);
+SELECT * FROM api.get_ratings_by_account_id(
+  '11111111-1111-1111-1111-111111111111'::uuid,
+  10,
+  0
+);
+
 
 -- ============================================
 -- TEST MATERIALIZED VIEW

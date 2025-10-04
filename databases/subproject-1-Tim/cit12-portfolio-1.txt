@@ -49,7 +49,8 @@ CALL
 
 CALL api.delete_account('22222222-2222-2222-2222-222222222222');
 
-psql:tests/profile-test.sql:17: NOTICE:  Created account with id ba4bebff-a54e-42b0-866d-acdbc6dd131d
+psql:tests/profile-test.sql:17: NOTICE:  Created account with id 5fb4e32e-047f-4072-86e6-4c1dc42cc1c1
+psql:tests/profile-test.sql:20: NOTICE:  Deleted account 22222222-2222-2222-2222-222222222222
 CALL
 
 
@@ -73,7 +74,6 @@ END;
 
 $$;
 
-psql:tests/profile-test.sql:20: NOTICE:  Deleted account 22222222-2222-2222-2222-222222222222
 psql:tests/profile-test.sql:31: NOTICE:  Expected error deleting non-existent account: Account 99999999-9999-9999-9999-999999999999 does not exist
 DO
 
@@ -92,8 +92,8 @@ SELECT * FROM api.get_all_accounts;
 
                   id                  |        email        | username |         created_at         
 --------------------------------------+---------------------+----------+----------------------------
- 11111111-1111-1111-1111-111111111111 | alice@example.com   | alice    | 2025-10-03 15:18:11.760579
- ba4bebff-a54e-42b0-866d-acdbc6dd131d | charlie@example.com | charlie  | 2025-10-03 15:18:11.760579
+ 11111111-1111-1111-1111-111111111111 | alice@example.com   | alice    | 2025-10-04 07:39:19.385351
+ 5fb4e32e-047f-4072-86e6-4c1dc42cc1c1 | charlie@example.com | charlie  | 2025-10-04 07:39:19.385351
 (2 rows)
 
 
@@ -104,8 +104,8 @@ SELECT * FROM api.get_accounts(2, 0);
 
                   id                  |        email        | username |         created_at         
 --------------------------------------+---------------------+----------+----------------------------
- 11111111-1111-1111-1111-111111111111 | alice@example.com   | alice    | 2025-10-03 15:18:11.760579
- ba4bebff-a54e-42b0-866d-acdbc6dd131d | charlie@example.com | charlie  | 2025-10-03 15:18:11.760579
+ 11111111-1111-1111-1111-111111111111 | alice@example.com   | alice    | 2025-10-04 07:39:19.385351
+ 5fb4e32e-047f-4072-86e6-4c1dc42cc1c1 | charlie@example.com | charlie  | 2025-10-04 07:39:19.385351
 (2 rows)
 
 
@@ -120,39 +120,27 @@ SELECT * FROM api.get_accounts(2, 2);
 
 
 
--- ============================================
+-- ============================================================
 
--- TEST BOOKMARKS
+-- TESTING BOOKMARKS (Titles + Persons)
 
--- ============================================
-
-
-
--- Add bookmark for Alice
-
-SELECT api.add_bookmark('11111111-1111-1111-1111-111111111111', 'tt0001', 'Great movie');
-
- add_bookmark 
---------------
- 
-(1 row)
+-- ============================================================
 
 
 
--- Update same bookmark (note changes via UPSERT)
+-- Add a title bookmark for Alice
 
-SELECT api.add_bookmark('11111111-1111-1111-1111-111111111111', 'tt0001', 'Changed my mind');
+SELECT api.add_bookmark(
 
- add_bookmark 
---------------
- 
-(1 row)
+  '11111111-1111-1111-1111-111111111111'::uuid, -- account_id
 
+  '11111111-2222-3333-4444-555555555555'::uuid, -- title_id
 
+  'title'::bookmark_target,
 
--- Add multiple bookmarks
+  'Great movie'::text
 
-SELECT api.add_bookmark('11111111-1111-1111-1111-111111111111', 'tt0002', 'Also good');
+);
 
  add_bookmark 
 --------------
@@ -161,15 +149,94 @@ SELECT api.add_bookmark('11111111-1111-1111-1111-111111111111', 'tt0002', 'Also 
 
 
 
--- Get AliceΓÇÖs bookmarks
+-- Update the same title bookmark (UPSERT behaviour)
 
-SELECT * FROM api.get_bookmarks('11111111-1111-1111-1111-111111111111', 10, 0);
+SELECT api.add_bookmark(
 
- title_id |      note       |          added_at          
-----------+-----------------+----------------------------
- tt0001   | Changed my mind | 2025-10-03 15:18:11.760579
- tt0002   | Also good       | 2025-10-03 15:18:11.760579
+  '11111111-1111-1111-1111-111111111111'::uuid,
+
+  '11111111-2222-3333-4444-555555555555'::uuid,
+
+  'title'::bookmark_target,
+
+  'Changed my mind'::text
+
+);
+
+ add_bookmark 
+--------------
+ 
+(1 row)
+
+
+
+-- Add another title bookmark
+
+SELECT api.add_bookmark(
+
+  '11111111-1111-1111-1111-111111111111'::uuid,
+
+  '66666666-7777-8888-9999-000000000000'::uuid,
+
+  'title'::bookmark_target,
+
+  'Also good'::text
+
+);
+
+ add_bookmark 
+--------------
+ 
+(1 row)
+
+
+
+-- Add a person bookmark
+
+SELECT api.add_bookmark(
+
+  '11111111-1111-1111-1111-111111111111'::uuid,
+
+  'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'::uuid,
+
+  'person'::bookmark_target,
+
+  'One of my favourite actors'::text
+
+);
+
+ add_bookmark 
+--------------
+ 
+(1 row)
+
+
+
+-- Get bookmarks (examples)
+
+SELECT * FROM api.get_bookmarks('11111111-1111-1111-1111-111111111111'::uuid);
+
+              target_id               | target_type |            note            |          added_at          
+--------------------------------------+-------------+----------------------------+----------------------------
+ 11111111-2222-3333-4444-555555555555 | title       | Changed my mind            | 2025-10-04 07:39:19.385351
+ 66666666-7777-8888-9999-000000000000 | title       | Also good                  | 2025-10-04 07:39:19.385351
+ aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee | person      | One of my favourite actors | 2025-10-04 07:39:19.385351
+(3 rows)
+
+SELECT * FROM api.get_bookmarks('11111111-1111-1111-1111-111111111111'::uuid, 'title'::bookmark_target);
+
+              target_id               | target_type |      note       |          added_at          
+--------------------------------------+-------------+-----------------+----------------------------
+ 11111111-2222-3333-4444-555555555555 | title       | Changed my mind | 2025-10-04 07:39:19.385351
+ 66666666-7777-8888-9999-000000000000 | title       | Also good       | 2025-10-04 07:39:19.385351
 (2 rows)
+
+SELECT * FROM api.get_bookmarks('11111111-1111-1111-1111-111111111111'::uuid, 'person'::bookmark_target);
+
+              target_id               | target_type |            note            |          added_at          
+--------------------------------------+-------------+----------------------------+----------------------------
+ aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee | person      | One of my favourite actors | 2025-10-04 07:39:19.385351
+(1 row)
 
 
 
@@ -183,30 +250,28 @@ SELECT * FROM api.get_bookmarks('11111111-1111-1111-1111-111111111111', 10, 0);
 
 -- Add searches
 
-SELECT api.add_search_to_history('11111111-1111-1111-1111-111111111111', 'matrix');
+SELECT api.add_search_to_history('11111111-1111-1111-1111-111111111111'::uuid, 'matrix');
 
  add_search_to_history 
 -----------------------
  
 (1 row)
 
-SELECT api.add_search_to_history('11111111-1111-1111-1111-111111111111', 'star wars');
+SELECT api.add_search_to_history('11111111-1111-1111-1111-111111111111'::uuid, 'harry potter');
 
  add_search_to_history 
 -----------------------
  
 (1 row)
-
-
 
 -- Get AliceΓÇÖs searches (limit 5)
 
-SELECT * FROM api.get_search_history('11111111-1111-1111-1111-111111111111', 5, 0);
+SELECT * FROM api.get_search_history('11111111-1111-1111-1111-111111111111'::uuid, 5, 0);
 
-   query   |        searched_at         
------------+----------------------------
- matrix    | 2025-10-03 15:18:11.760579
- star wars | 2025-10-03 15:18:11.760579
+    query     |        searched_at         
+--------------+----------------------------
+ matrix       | 2025-10-04 07:39:19.385351
+ harry potter | 2025-10-04 07:39:19.385351
 (2 rows)
 
 
@@ -221,7 +286,17 @@ SELECT * FROM api.get_search_history('11111111-1111-1111-1111-111111111111', 5, 
 
 -- Add rating for Alice
 
-SELECT api.add_rating('11111111-1111-1111-1111-111111111111', 'tt0001', 8, 'Pretty good');
+SELECT api.add_rating(
+
+  '11111111-1111-1111-1111-111111111111'::uuid,
+
+  '22222222-3333-4444-5555-666666666666'::uuid, -- UUID for a title
+
+  8,
+
+  'Pretty good'
+
+);
 
  add_rating 
 ------------
@@ -232,7 +307,17 @@ SELECT api.add_rating('11111111-1111-1111-1111-111111111111', 'tt0001', 8, 'Pret
 
 -- Update same rating
 
-SELECT api.add_rating('11111111-1111-1111-1111-111111111111', 'tt0001', 9, 'Even better');
+SELECT api.add_rating(
+
+  '11111111-1111-1111-1111-111111111111'::uuid,
+
+  '22222222-3333-4444-5555-666666666666'::uuid,
+
+  9,
+
+  'Even better'
+
+);
 
  add_rating 
 ------------
@@ -243,7 +328,17 @@ SELECT api.add_rating('11111111-1111-1111-1111-111111111111', 'tt0001', 9, 'Even
 
 -- Add another rating
 
-SELECT api.add_rating('11111111-1111-1111-1111-111111111111', 'tt0002', 5, 'Meh');
+SELECT api.add_rating(
+
+  '11111111-1111-1111-1111-111111111111'::uuid,
+
+  '77777777-8888-9999-0000-aaaaaaaaaaaa'::uuid, -- another title UUID
+
+  5,
+
+  'Meh'
+
+);
 
  add_rating 
 ------------
@@ -254,13 +349,23 @@ SELECT api.add_rating('11111111-1111-1111-1111-111111111111', 'tt0002', 5, 'Meh'
 
 -- Get AliceΓÇÖs ratings
 
-SELECT * FROM api.get_ratings_by_account_id('11111111-1111-1111-1111-111111111111', 10, 0);
+SELECT * FROM api.get_ratings_by_account_id(
 
- title_id | rating |   comment   |         created_at         
-----------+--------+-------------+----------------------------
- tt0001   |      9 | Even better | 2025-10-03 15:18:11.760579
- tt0002   |      5 | Meh         | 2025-10-03 15:18:11.760579
+  '11111111-1111-1111-1111-111111111111'::uuid,
+
+  10,
+
+  0
+
+);
+
+               title_id               | rating |   comment   |         created_at         
+--------------------------------------+--------+-------------+----------------------------
+ 22222222-3333-4444-5555-666666666666 |      9 | Even better | 2025-10-04 07:39:19.385351
+ 77777777-8888-9999-0000-aaaaaaaaaaaa |      5 | Meh         | 2025-10-04 07:39:19.385351
 (2 rows)
+
+
 
 
 
@@ -282,10 +387,10 @@ REFRESH MATERIALIZED VIEW
 -- Check aggregated ratings
 
 SELECT * FROM api.title_avg_ratings ORDER BY avg_rating DESC;
- title_id |     avg_rating     | num_ratings 
-----------+--------------------+-------------
- tt0001   | 9.0000000000000000 |           1
- tt0002   | 5.0000000000000000 |           1
+               title_id               |     avg_rating     | num_ratings 
+--------------------------------------+--------------------+-------------
+ 22222222-3333-4444-5555-666666666666 | 9.0000000000000000 |           1
+ 77777777-8888-9999-0000-aaaaaaaaaaaa | 5.0000000000000000 |           1
 (2 rows)
 
 ROLLBACK;

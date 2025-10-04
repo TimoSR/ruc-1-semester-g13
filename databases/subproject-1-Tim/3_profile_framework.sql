@@ -152,20 +152,29 @@ $$ LANGUAGE plpgsql;
 -- BOOKMARKS
 -- =========================================================
 
+CREATE TYPE bookmark_target AS ENUM ('all', 'title', 'person');
+
 CREATE OR REPLACE FUNCTION api.add_bookmark(
-	p_account_id UUID,
-	p_title_id VARCHAR(20),
-	p_note TEXT DEFAULT NULL
+    p_account_id UUID,
+    p_target_id UUID,
+    p_type bookmark_target DEFAULT 'title',
+    p_note TEXT DEFAULT NULL
 ) RETURNS VOID AS $$
 BEGIN
-	INSERT INTO profile.bookmark (account_id, title_id, note)
-	VALUES (p_account_id, p_title_id, p_note)
-	ON CONFLICT (account_id, title_id)
-	DO UPDATE SET note = EXCLUDED.note, added_at = now();
+    IF p_type = 'title' THEN
+        INSERT INTO profile.bookmark_title (account_id, title_id, note)
+        VALUES (p_account_id, p_target_id, p_note)
+        ON CONFLICT (account_id, title_id)
+        DO UPDATE SET note = EXCLUDED.note, added_at = now();
+
+    ELSIF p_type = 'person' THEN
+        INSERT INTO profile.bookmark_person (account_id, person_id, note)
+        VALUES (p_account_id, p_target_id, p_note)
+        ON CONFLICT (account_id, person_id)
+        DO UPDATE SET note = EXCLUDED.note, added_at = now();
+    END IF;
 END;
 $$ LANGUAGE plpgsql;
-
-CREATE TYPE bookmark_target AS ENUM ('all', 'title', 'person');
 
 CREATE OR REPLACE FUNCTION api.get_bookmarks(
     p_account_id UUID,
@@ -253,19 +262,19 @@ $$ LANGUAGE plpgsql;
 -- =========================================================
 
 CREATE OR REPLACE FUNCTION api.add_rating(
-	p_account_id UUID,
-	p_title_id   VARCHAR(20),
-	p_rating     INT,
-	p_comment    TEXT DEFAULT NULL
+    p_account_id UUID,
+    p_title_id   UUID,  -- changed from VARCHAR(20)
+    p_rating     INT,
+    p_comment    TEXT DEFAULT NULL
 ) RETURNS VOID AS $$
 BEGIN
-	INSERT INTO profile.rating_history (account_id, title_id, rating, comment)
-	VALUES (p_account_id, p_title_id, p_rating, p_comment)
-	ON CONFLICT (account_id, title_id)
-	DO UPDATE SET 
-		rating     = EXCLUDED.rating,
-		comment    = EXCLUDED.comment,
-		created_at = now();
+    INSERT INTO profile.rating_history (account_id, title_id, rating, comment)
+    VALUES (p_account_id, p_title_id, p_rating, p_comment)
+    ON CONFLICT (account_id, title_id)
+    DO UPDATE SET 
+        rating     = EXCLUDED.rating,
+        comment    = EXCLUDED.comment,
+        created_at = now();
 END;
 $$ LANGUAGE plpgsql;
 
@@ -275,7 +284,7 @@ CREATE OR REPLACE FUNCTION api.get_ratings_by_account_id(
 	p_limit INT DEFAULT 50,
 	p_offset INT DEFAULT 0
 ) RETURNS TABLE(
-	title_id VARCHAR(20),
+	title_id UUID,
 	rating INT,
 	comment TEXT,
 	created_at TIMESTAMP
