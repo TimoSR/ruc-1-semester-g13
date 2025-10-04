@@ -2,6 +2,21 @@
 -- MIGRATE DATA FROM SOURCE TABLES
 -- ============================================
 
+-- Word Index (WI)
+
+INSERT INTO movie_db.word_index (title_id, legacy_id, word, field, lexeme)
+SELECT 
+    t.id AS title_id,
+    t.legacy_id,
+    wi.word,
+    wi.field,
+    wi.lexeme
+FROM public.wi wi
+JOIN movie_db.title t
+  ON t.legacy_id = trim(wi.tconst);  -- trim CHAR(10) padding
+
+SELECT COUNT(*) FROM movie_db.word_index;
+
 -- Titles
 INSERT INTO movie_db.title (legacy_id, title_type, primary_title, original_title, is_adult, 
                   start_year, end_year, runtime_minutes, poster_url, plot)
@@ -167,3 +182,4 @@ DROP TABLE IF EXISTS public.title_principals CASCADE;
 DROP TABLE IF EXISTS public.title_ratings CASCADE;
 DROP TABLE IF EXISTS public.name_basics CASCADE;
 DROP TABLE IF EXISTS public.omdb_data CASCADE;
+DROP TABLE IF EXISTS public.wi CASCADE;

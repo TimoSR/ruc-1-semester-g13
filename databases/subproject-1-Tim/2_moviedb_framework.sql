@@ -20,7 +20,7 @@ DROP TABLE IF EXISTS movie_db.title CASCADE;
 
 CREATE TABLE movie_db.title (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    legacy_id VARCHAR(20) UNIQUE NOT NULL,   -- IMDb tconst
+    legacy_id VARCHAR(20) UNIQUE NOT NULL,
     title_type VARCHAR(50) NOT NULL,
     primary_title VARCHAR(500) NOT NULL,
     original_title VARCHAR(500),
@@ -32,11 +32,19 @@ CREATE TABLE movie_db.title (
     plot TEXT
 );
 
+-- Raw user ratings (future-proof)
+CREATE TABLE movie_db.user_rating (
+    account_id UUID NOT NULL,
+    title_id   UUID NOT NULL REFERENCES movie_db.title(id) ON DELETE CASCADE,
+    rating     INT NOT NULL CHECK (rating BETWEEN 1 AND 10),
+    PRIMARY KEY (account_id, title_id)  -- ensures one rating per account/title
+);
+
+-- Aggregate ratings (historical + summary)
 CREATE TABLE movie_db.rating (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    title_id UUID NOT NULL REFERENCES movie_db.title(id) ON DELETE CASCADE,
+    title_id UUID PRIMARY KEY REFERENCES movie_db.title(id) ON DELETE CASCADE,
     average_rating FLOAT CHECK (average_rating BETWEEN 0 AND 10),
-    num_votes INT CHECK (num_votes >= 0)
+    num_votes INT CHECK (num_votes >= 0) DEFAULT 0
 );
 
 CREATE TABLE movie_db.genre (
@@ -102,163 +110,159 @@ CREATE TABLE movie_db.actor (
     credit_order INTEGER
 );
 
+CREATE TABLE movie_db.word_index (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    legacy_id VARCHAR(20) NOT NULL,
+    title_id UUID NOT NULL REFERENCES movie_db.title(id) ON DELETE CASCADE,
+    word TEXT NOT NULL,
+    field CHAR(1) NOT NULL,
+    lexeme TEXT
+);
+
 -- ============================================
 -- FUNCTIONS (API schema)
 -- ============================================
 
-CREATE OR REPLACE FUNCTION api.string_search(p_profile_id INT, p_query TEXT)
-RETURNS TABLE (tconst VARCHAR(20), primarytitle VARCHAR(500))
+CREATE OR REPLACE FUNCTION api.add_user_title_rating(
+    p_account_id UUID,
+    p_title_id   UUID,
+    p_rate       INT
+)
+RETURNS TABLE (
+    out_title_id UUID,
+    out_average_rating DOUBLE PRECISION,
+    out_num_votes BIGINT
+)
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  INSERT INTO search_history(profile_id, search_query)
-  VALUES (p_profile_id, p_query);
+  -- Store or update the individual vote
+  IF p_account_id IS NOT NULL THEN
+    INSERT INTO movie_db.user_rating (account_id, title_id, rating)
+    VALUES (p_account_id, p_title_id, p_rate)
+    ON CONFLICT (account_id, title_id)
+    DO UPDATE SET rating = EXCLUDED.rating;
+  END IF;
 
+  -- Recalculate/update the aggregate
   RETURN QUERY
-  SELECT t.id, t.primary_title
-  FROM title t
-  WHERE t.primary_title ILIKE '%' || p_query || '%'
-     OR t.plot          ILIKE '%' || p_query || '%';
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION api.rate(p_profile_id INT, p_title_id VARCHAR(20), p_rate INT)
-RETURNS TABLE (title_id VARCHAR(20), average_rating FLOAT, num_votes INT)
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  RETURN QUERY
-  INSERT INTO rating(title_id, average_rating, num_votes)
-  VALUES (p_title_id, p_rate::float, 1)
-  ON CONFLICT ON CONSTRAINT rating_pkey   -- undgår ambiguity
-  DO UPDATE SET
-    average_rating = ((rating.average_rating * rating.num_votes) + EXCLUDED.average_rating)
-                     / (rating.num_votes + 1),
-    num_votes      = rating.num_votes + 1
+  INSERT INTO movie_db.rating (title_id, average_rating, num_votes)
+  SELECT ur.title_id, AVG(ur.rating)::DOUBLE PRECISION, COUNT(*)::BIGINT
+  FROM movie_db.user_rating ur
+  WHERE ur.title_id = p_title_id
+  GROUP BY ur.title_id
+  ON CONFLICT (title_id) DO UPDATE
+    SET average_rating = EXCLUDED.average_rating,
+        num_votes      = EXCLUDED.num_votes
   RETURNING rating.title_id, rating.average_rating, rating.num_votes;
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION api.find_person_by_name(search_term TEXT)
+CREATE OR REPLACE FUNCTION api.get_person_by_name(search_term TEXT)
 RETURNS TABLE (
-  person_id VARCHAR(50),
+  person_id UUID,
   name      TEXT
 )
 LANGUAGE sql
 AS $$
-  SELECT p.id::varchar(50) AS person_id,
-         p.primary_name     AS name
-  FROM person p
+  SELECT p.id, p.primary_name
+  FROM movie_db.person p
   WHERE p.primary_name ILIKE '%' || search_term || '%'
   ORDER BY p.primary_name
-  LIMIT 1;   -- keep her original behaviour
+  LIMIT 1;
 $$;
 
-CREATE OR REPLACE FUNCTION api.find_coplayers(actor_name TEXT)
+CREATE OR REPLACE FUNCTION api.get_coplayers(p_actor_name TEXT)
 RETURNS TABLE (
-    person_id VARCHAR(10),
+    person_id UUID,
     primary_name TEXT,
-    frequency INT
+    frequency BIGINT  -- changed to BIGINT
 )
 LANGUAGE plpgsql 
 AS $$
 BEGIN
     RETURN QUERY
-    -- find the person_id of actor from their name
     WITH target_actor AS (
-        SELECT id AS person_id
-        FROM person
-        WHERE primary_name = actor_name
+        SELECT p.id AS person_id
+        FROM movie_db.person p
+        WHERE p.primary_name = p_actor_name
         LIMIT 1
     ),
-    -- find all the movies the actor worked in
     target_titles AS (
         SELECT a.title_id
-        FROM actor a
+        FROM movie_db.actor a
         JOIN target_actor t ON a.person_id = t.person_id
     ),
-    -- count how many times each other actor is in the same titles 
     co_actors AS (
         SELECT a.person_id, COUNT(*) AS freq
-        FROM actor a
+        FROM movie_db.actor a
         JOIN target_titles tt ON a.title_id = tt.title_id
         JOIN target_actor t ON a.person_id <> t.person_id
         GROUP BY a.person_id
     )
-    -- join with person to return their names, sorted by frequency
-    SELECT p.id, p.primary_name, c.freq
+    SELECT p.id, p.primary_name::TEXT, c.freq
     FROM co_actors c
-    JOIN person p ON p.id = c.person_id
+    JOIN movie_db.person p ON p.id = c.person_id
     ORDER BY c.freq DESC, p.primary_name;
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION api.calculate_actor_ratings()
-RETURNS void
-LANGUAGE plpgsql 
-AS $$
-BEGIN
-    -- clear old ratings
-    DELETE FROM person_rating;
+-- As it often needs to be calculated I think it could be nice as a view
+CREATE MATERIALIZED VIEW movie_db.get_actor_avg_title_rating
+AS
+SELECT 
+    a.person_id,
+    ROUND(SUM(r.average_rating * r.num_votes)::NUMERIC / NULLIF(SUM(r.num_votes), 0), 2) AS weighted_rating
+FROM movie_db.actor a
+JOIN movie_db.rating r ON a.title_id = r.title_id
+GROUP BY a.person_id
+WITH DATA;
 
-    -- update ratings
-    INSERT INTO person_rating (person_id, weighted_rating)
-    SELECT 
-        a.person_id,
-        ROUND(SUM(r.average_rating * r.num_votes)::NUMERIC / NULLIF(SUM(r.num_votes),0), 2) AS weighted_rating
-    FROM actor a
-    JOIN rating r ON a.title_id = r.title_id
-    GROUP BY a.person_id;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION api.get_popular_coplayers(p_actor_name TEXT)
+CREATE OR REPLACE FUNCTION api.get_popular_co_actors(p_actor_name TEXT)
 RETURNS TABLE (
-    actor_id VARCHAR(20),
+    actor_id UUID,
     actor_fullname TEXT,
     weighted_rating NUMERIC(5,2)
 )
-LANGUAGE plpgsql 
+LANGUAGE sql
 AS $$
-BEGIN
-    RETURN QUERY
-    WITH target AS (
-        SELECT id AS actor_id
-        FROM person
-        WHERE primary_name = p_actor_name
-        LIMIT 1
-    ),
-    target_titles AS (
-        SELECT a.title_id
-        FROM actor a
-        JOIN target t ON a.person_id = t.actor_id
-    )
-    SELECT 
-        p.id,
-        p.primary_name::text,       -- fix mismatch
-        pr.weighted_rating
-    FROM actor a
-    JOIN target_titles tt ON tt.title_id = a.title_id
-    JOIN person p ON p.id = a.person_id
-    LEFT JOIN person_rating pr ON pr.person_id = p.id
-    JOIN target t ON t.actor_id <> a.person_id
-    ORDER BY pr.weighted_rating DESC NULLS LAST, p.primary_name;
-END;
+  WITH target AS (
+      SELECT id AS actor_id
+      FROM movie_db.person
+      WHERE primary_name = p_actor_name
+      LIMIT 1
+  ),
+  target_titles AS (
+      SELECT a.title_id
+      FROM movie_db.actor a
+      JOIN target t ON a.person_id = t.actor_id
+  )
+  SELECT 
+      p.id,
+      p.primary_name,
+      ar.weighted_rating
+  FROM movie_db.actor a
+  JOIN target_titles tt ON tt.title_id = a.title_id
+  JOIN movie_db.person p ON p.id = a.person_id
+  LEFT JOIN movie_db.get_actor_avg_title_rating ar 
+         ON ar.person_id = p.id
+  JOIN target t ON t.actor_id <> a.person_id
+  ORDER BY ar.weighted_rating DESC NULLS LAST, p.primary_name;
 $$;
 
-CREATE OR REPLACE FUNCTION api.similar_movies(p_title_id VARCHAR(20), p_limit INT DEFAULT 20)
-RETURNS TABLE (sim_title_id VARCHAR(20), primary_title VARCHAR(500), jaccard_genre FLOAT)
+CREATE OR REPLACE FUNCTION api.get_similar_movies(p_title_id UUID, p_limit INT DEFAULT 20)
+RETURNS TABLE (sim_title_id UUID, primary_title VARCHAR(500), jaccard_genre FLOAT)
 LANGUAGE sql
 AS $$
 WITH base AS (
   SELECT ARRAY_AGG(g.genre ORDER BY g.genre) AS gset
-  FROM genre g
+  FROM movie_db.genre g
   WHERE g.title_id = p_title_id
 ),
 cand AS (
   SELECT t.id, t.primary_title, ARRAY_AGG(g.genre ORDER BY g.genre) AS gset
-  FROM title t
-  JOIN genre g ON g.title_id = t.id
+  FROM movie_db.title t
+  JOIN movie_db.genre g ON g.title_id = t.id
   WHERE t.id <> p_title_id
   GROUP BY t.id, t.primary_title
 )
@@ -280,187 +284,137 @@ ORDER BY jaccard_genre DESC, c.primary_title
 LIMIT p_limit;
 $$;
 
--- Search
+
+-- ============================================
+-- Search FUNCTIONS (API schema)
+-- ============================================
+
+
+-- These had profile interaction which is bad practise
+------
+
+CREATE OR REPLACE FUNCTION api.string_search_title(p_query TEXT)
+RETURNS TABLE (
+    title_id UUID,
+    primary_title VARCHAR(500)
+)
+LANGUAGE sql
+AS $$
+    SELECT t.id, t.primary_title
+    FROM movie_db.title t
+    WHERE t.primary_title ILIKE '%' || p_query || '%'
+       OR t.plot          ILIKE '%' || p_query || '%'
+    ORDER BY t.primary_title;
+$$;
+
+CREATE OR REPLACE FUNCTION api.structured_string_search(
+  p_title_q  TEXT,
+  p_plot_q   TEXT,
+  p_char_q   TEXT,
+  p_person_q TEXT
+)
+RETURNS TABLE (
+    title_id UUID,
+    primary_title VARCHAR(500)
+)
+LANGUAGE sql
+AS $$
+  SELECT DISTINCT t.id, t.primary_title
+  FROM movie_db.title t
+  LEFT JOIN movie_db.actor a   ON a.title_id = t.id
+  LEFT JOIN movie_db.person p  ON p.id = a.person_id
+  WHERE (p_title_q  IS NULL OR t.primary_title ILIKE '%' || p_title_q  || '%')
+    AND (p_plot_q   IS NULL OR t.plot          ILIKE '%' || p_plot_q   || '%')
+    AND (p_char_q   IS NULL OR a.character_name ILIKE '%' || p_char_q  || '%')
+    AND (p_person_q IS NULL OR p.primary_name  ILIKE '%' || p_person_q || '%')
+  ORDER BY t.primary_title;
+$$;
+
+---
 
 CREATE OR REPLACE FUNCTION api.person_words(
-  p_person_name VARCHAR(100),
+  p_person_name TEXT,
   max_words INT DEFAULT 10
 )
 RETURNS TABLE (
   word TEXT,
   frequency INT
 )
-LANGUAGE plpgsql
+LANGUAGE sql
 AS $$
-BEGIN
-  RETURN QUERY
-  SELECT wi.word, COUNT(*)::INT AS frequency   -- cast til INT
-  FROM person p
-  JOIN actor a ON a.person_id = p.id
-  JOIN wi ON wi.tconst = a.title_id
+  SELECT wi.word, COUNT(*)::INT AS frequency
+  FROM movie_db.person p
+  JOIN movie_db.actor a ON a.person_id = p.id
+  JOIN movie_db.word_index wi ON wi.title_id = a.title_id
   WHERE p.primary_name ILIKE '%' || p_person_name || '%'
     AND length(wi.word) > 2
   GROUP BY wi.word
   ORDER BY frequency DESC
   LIMIT max_words;
-END;
 $$;
 
 CREATE OR REPLACE FUNCTION api.exact_match_query(keywords TEXT[])
 RETURNS TABLE (
-    title_id VARCHAR(20),
+    title_id UUID,
     primary_title TEXT
 )
-LANGUAGE plpgsql 
+LANGUAGE sql 
 AS $$
-BEGIN
-    RETURN QUERY
-    SELECT t.id, t.primary_title::TEXT
-    FROM title t
-    WHERE t.id IN (
-        SELECT tconst
-        FROM wi
-        WHERE lower(word) = ANY(SELECT lower(k) FROM unnest(keywords) k)  -- case-insensitive match
-        GROUP BY tconst
-        HAVING COUNT(DISTINCT lower(word)) = array_length(keywords,1)
-    )
-    ORDER BY t.primary_title;
-END;
+  SELECT t.id, t.primary_title
+  FROM movie_db.title t
+  WHERE t.id IN (
+      SELECT wi.title_id
+      FROM movie_db.word_index wi
+      WHERE lower(wi.word) = ANY(
+          SELECT lower(k) FROM unnest(keywords) k
+      )
+      GROUP BY wi.title_id
+      HAVING COUNT(DISTINCT lower(wi.word)) = array_length(keywords,1)
+  )
+  ORDER BY t.primary_title;
+$$;
 
 CREATE OR REPLACE FUNCTION api.best_match_query(keywords TEXT[])
 RETURNS TABLE (
-    title_id VARCHAR(20),
+    title_id UUID,
     primary_title TEXT,
     match_count INT
 )
-LANGUAGE plpgsql 
+LANGUAGE sql 
 AS $$
-BEGIN
-    RETURN QUERY
-    SELECT 
-        t.id,
-        t.primary_title::TEXT,
-        COUNT(DISTINCT wi.word)::INT AS match_count   -- fix: cast til INT
-    FROM title t
-    JOIN wi ON t.id = wi.tconst
-    WHERE lower(wi.word) = ANY(SELECT lower(k) FROM unnest(keywords) k)
-    GROUP BY t.id, t.primary_title
-    ORDER BY match_count DESC, t.primary_title;
-END;
+  SELECT 
+      t.id,
+      t.primary_title,
+      COUNT(DISTINCT wi.word)::INT AS match_count
+  FROM movie_db.title t
+  JOIN movie_db.word_index wi ON t.id = wi.title_id
+  WHERE lower(wi.word) = ANY(
+      SELECT lower(k) FROM unnest(keywords) k
+  )
+  GROUP BY t.id, t.primary_title
+  ORDER BY match_count DESC, t.primary_title;
 $$;
 
-CREATE OR REPLACE FUNCTION api.structured_string_search(
-  p_profile_id INT,
-  p_title_q    TEXT,
-  p_plot_q     TEXT,
-  p_char_q     TEXT,
-  p_person_q   TEXT
-)
-RETURNS TABLE (tconst VARCHAR(20), primarytitle VARCHAR(500))
-LANGUAGE plpgsql
-AS $$
-DECLARE
-  v_has_actor  BOOLEAN;
-  v_has_person BOOLEAN;
-  sql TEXT := 'SELECT DISTINCT t.id, t.primary_title FROM title t';
-  where_clauses TEXT := ' WHERE 1=1';
-  -- param-variables
-  p1 TEXT; p2 TEXT; p3 TEXT; p4 TEXT;
-  n  INT := 0;
-BEGIN
-  -- log i search_history 
-  INSERT INTO search_history(profile_id, search_query)
-  VALUES (p_profile_id,
-          CONCAT_WS(' | ',
-            NULLIF('title='||COALESCE(p_title_q,''), 'title='),
-            NULLIF('plot='||COALESCE(p_plot_q,''), 'plot='),
-            NULLIF('char='||COALESCE(p_char_q,''), 'char='),
-            NULLIF('person='||COALESCE(p_person_q,''), 'person=')
-          )
-  );
-
-  SELECT EXISTS (
-           SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
-           WHERE c.relname='actor' AND n.nspname='public'
-         ) INTO v_has_actor;
-
-  SELECT EXISTS (
-           SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
-           WHERE c.relname='person' AND n.nspname='public'
-         ) INTO v_has_person;
-
-  -- Join with actor/person if available (for character/person search).
-  IF v_has_actor THEN
-    sql := sql || ' LEFT JOIN actor a ON a.title_id = t.id';
-    IF v_has_person THEN
-      sql := sql || ' LEFT JOIN person p ON p.id = a.person_id';
-    END IF;
-  END IF;
-
-  -- title filter
-  IF p_title_q IS NOT NULL AND p_title_q <> '' THEN
-    p1 := '%' || p_title_q || '%'; n := n + 1;
-    where_clauses := where_clauses || format(' AND t.primary_title ILIKE $%s', n);
-  END IF;
-
-  -- plot filter
-  IF p_plot_q IS NOT NULL AND p_plot_q <> '' THEN
-    p2 := '%' || p_plot_q || '%'; n := n + 1;
-    where_clauses := where_clauses || format(' AND t.plot ILIKE $%s', n);
-  END IF;
-
-  -- Character filter (only if actor exists)
-  IF (p_char_q IS NOT NULL AND p_char_q <> '') AND v_has_actor THEN
-    p3 := '%' || p_char_q || '%'; n := n + 1;
-    where_clauses := where_clauses || format(' AND a.character_name ILIKE $%s', n);
-  END IF;
-
-  -- Character filter (only if actor exists)
-  IF (p_person_q IS NOT NULL AND p_person_q <> '') AND v_has_actor AND v_has_person THEN
-    p4 := '%' || p_person_q || '%'; n := n + 1;
-    where_clauses := where_clauses || format(' AND p.primary_name ILIKE $%s', n);
-  END IF;
-
-  sql := sql || where_clauses || ' ORDER BY t.primary_title';
-
-  -- execute dynamically using the parameters that were actually provided.
-  IF n = 0 THEN
-    RETURN QUERY EXECUTE sql;                                -- no filters
-  ELSIF n = 1 THEN
-    RETURN QUERY EXECUTE sql USING COALESCE(p1,p2,p3,p4);
-  ELSIF n = 2 THEN
-    RETURN QUERY EXECUTE sql USING p1, COALESCE(p2,p3,p4);
-  ELSIF n = 3 THEN
-    RETURN QUERY EXECUTE sql USING p1, p2, COALESCE(p3,p4);
-  ELSE  -- n = 4
-    RETURN QUERY EXECUTE sql USING p1, p2, p3, p4;
-  END IF;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION word_to_words_query(p_keywords TEXT[])
+CREATE OR REPLACE FUNCTION api.word_to_words_query(p_keywords TEXT[], p_limit INT DEFAULT 20)
 RETURNS TABLE (
     word TEXT,
     frequency INT
 )
-LANGUAGE plpgsql 
+LANGUAGE sql 
 AS $$
-BEGIN
-    RETURN QUERY
-    WITH matching_titles AS (
-        SELECT DISTINCT tconst
-        FROM wi
-        WHERE wi.word = ANY(p_keywords)
-    ),
-    word_counts AS (
-        SELECT wi.word AS keyword, COUNT(*)::INT AS freq
-        FROM wi
-        JOIN matching_titles mt ON wi.tconst = mt.tconst
-        GROUP BY wi.word
-    )
-    SELECT keyword, freq
-    FROM word_counts
-    ORDER BY freq DESC, keyword
-    LIMIT 20;
-END;
+  WITH matching_titles AS (
+      SELECT DISTINCT wi.title_id
+      FROM movie_db.word_index wi
+      WHERE wi.word = ANY(p_keywords)
+  ),
+  word_counts AS (
+      SELECT wi.word AS keyword, COUNT(*)::INT AS freq
+      FROM movie_db.word_index wi
+      JOIN matching_titles mt ON wi.title_id = mt.title_id
+      GROUP BY wi.word
+  )
+  SELECT keyword, freq
+  FROM word_counts
+  ORDER BY freq DESC, keyword
+  LIMIT p_limit;
 $$;

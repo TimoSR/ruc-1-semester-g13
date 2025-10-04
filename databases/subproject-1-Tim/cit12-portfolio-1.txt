@@ -49,9 +49,9 @@ CALL
 
 CALL api.delete_account('22222222-2222-2222-2222-222222222222');
 
-psql:tests/profile-test.sql:17: NOTICE:  Created account with id f2c5de6a-927c-4dfb-8018-96fda256b059
-CALL
+psql:tests/profile-test.sql:17: NOTICE:  Created account with id 1121694a-8648-4718-883f-98543c4e5a35
 psql:tests/profile-test.sql:20: NOTICE:  Deleted account 22222222-2222-2222-2222-222222222222
+CALL
 
 
 -- Attempt to delete a non-existing account (should raise exception)
@@ -92,8 +92,8 @@ SELECT * FROM api.get_all_accounts;
 
                   id                  |        email        | username |         created_at         
 --------------------------------------+---------------------+----------+----------------------------
- 11111111-1111-1111-1111-111111111111 | alice@example.com   | alice    | 2025-10-04 08:49:55.962354
- f2c5de6a-927c-4dfb-8018-96fda256b059 | charlie@example.com | charlie  | 2025-10-04 08:49:55.962354
+ 11111111-1111-1111-1111-111111111111 | alice@example.com   | alice    | 2025-10-04 13:36:55.677608
+ 1121694a-8648-4718-883f-98543c4e5a35 | charlie@example.com | charlie  | 2025-10-04 13:36:55.677608
 (2 rows)
 
 
@@ -104,8 +104,8 @@ SELECT * FROM api.get_accounts(2, 0);
 
                   id                  |        email        | username |         created_at         
 --------------------------------------+---------------------+----------+----------------------------
- 11111111-1111-1111-1111-111111111111 | alice@example.com   | alice    | 2025-10-04 08:49:55.962354
- f2c5de6a-927c-4dfb-8018-96fda256b059 | charlie@example.com | charlie  | 2025-10-04 08:49:55.962354
+ 11111111-1111-1111-1111-111111111111 | alice@example.com   | alice    | 2025-10-04 13:36:55.677608
+ 1121694a-8648-4718-883f-98543c4e5a35 | charlie@example.com | charlie  | 2025-10-04 13:36:55.677608
 (2 rows)
 
 
@@ -298,8 +298,8 @@ END;
 
 $$;
 
-DO
 psql:tests/profile-test.sql:116: NOTICE:  Expected error updating non-existent bookmark: No existing bookmark found for account 11111111-1111-1111-1111-111111111111, target 99999999-aaaa-bbbb-cccc-111111111111 (title).
+DO
 
 
 -- Get all bookmarks for Alice
@@ -308,9 +308,9 @@ SELECT * FROM api.get_bookmarks('11111111-1111-1111-1111-111111111111'::uuid);
 
               target_id               | target_type |            note             |          added_at          
 --------------------------------------+-------------+-----------------------------+----------------------------
- 11111111-2222-3333-4444-555555555555 | title       |                             | 2025-10-04 08:49:55.962354
- 66666666-7777-8888-9999-000000000000 | title       |                             | 2025-10-04 08:49:55.962354
- aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee | person      | {"text": "Favourite actor"} | 2025-10-04 08:49:55.962354
+ 11111111-2222-3333-4444-555555555555 | title       |                             | 2025-10-04 13:36:55.677608
+ 66666666-7777-8888-9999-000000000000 | title       |                             | 2025-10-04 13:36:55.677608
+ aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee | person      | {"text": "Favourite actor"} | 2025-10-04 13:36:55.677608
 (3 rows)
 
 
@@ -321,8 +321,8 @@ SELECT * FROM api.get_bookmarks('11111111-1111-1111-1111-111111111111'::uuid, 't
 
               target_id               | target_type | note |          added_at          
 --------------------------------------+-------------+------+----------------------------
- 11111111-2222-3333-4444-555555555555 | title       |      | 2025-10-04 08:49:55.962354
- 66666666-7777-8888-9999-000000000000 | title       |      | 2025-10-04 08:49:55.962354
+ 11111111-2222-3333-4444-555555555555 | title       |      | 2025-10-04 13:36:55.677608
+ 66666666-7777-8888-9999-000000000000 | title       |      | 2025-10-04 13:36:55.677608
 (2 rows)
 
 
@@ -333,7 +333,7 @@ SELECT * FROM api.get_bookmarks('11111111-1111-1111-1111-111111111111'::uuid, 'p
 
               target_id               | target_type |            note             |          added_at          
 --------------------------------------+-------------+-----------------------------+----------------------------
- aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee | person      | {"text": "Favourite actor"} | 2025-10-04 08:49:55.962354
+ aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee | person      | {"text": "Favourite actor"} | 2025-10-04 13:36:55.677608
 (1 row)
 
 
@@ -368,8 +368,8 @@ SELECT * FROM api.get_search_history('11111111-1111-1111-1111-111111111111'::uui
 
     query     |        searched_at         
 --------------+----------------------------
- matrix       | 2025-10-04 08:49:55.962354
- harry potter | 2025-10-04 08:49:55.962354
+ matrix       | 2025-10-04 13:36:55.677608
+ harry potter | 2025-10-04 13:36:55.677608
 (2 rows)
 
 
@@ -459,8 +459,8 @@ SELECT * FROM api.get_ratings_by_account_id(
 
                title_id               | rating |   comment   |         created_at         
 --------------------------------------+--------+-------------+----------------------------
- 22222222-3333-4444-5555-666666666666 |      9 | Even better | 2025-10-04 08:49:55.962354
- 77777777-8888-9999-0000-aaaaaaaaaaaa |      5 | Meh         | 2025-10-04 08:49:55.962354
+ 22222222-3333-4444-5555-666666666666 |      9 | Even better | 2025-10-04 13:36:55.677608
+ 77777777-8888-9999-0000-aaaaaaaaaaaa |      5 | Meh         | 2025-10-04 13:36:55.677608
 (2 rows)
 
 
@@ -491,5 +491,130 @@ SELECT * FROM api.title_avg_ratings ORDER BY avg_rating DESC;
  77777777-8888-9999-0000-aaaaaaaaaaaa | 5.0000000000000000 |           1
 (2 rows)
 
-ROLLBACK;
-ROLLBACK
+\i ./tests/movie-db-tests.sql
+
+-- ============================================
+
+-- B2_function_tests.sql (UUIDs with explicit casts)
+
+-- ============================================
+
+
+
+-- ============================================
+
+-- Seed test data
+
+-- ============================================
+
+
+
+-- Titles
+
+INSERT INTO movie_db.title (id, legacy_id, title_type, primary_title, plot)
+
+VALUES 
+
+  ('11111111-1111-1111-1111-111111111111'::uuid, 'seed1', 'movie', 'Test Movie A', 'A hero saves the world'),
+
+  ('22222222-2222-2222-2222-222222222222'::uuid, 'seed2', 'movie', 'Test Movie B', 'A villain takes over'),
+
+  ('33333333-3333-3333-3333-333333333333'::uuid, 'seed3', 'movie', 'Romantic Movie', 'A love story plot');
+
+INSERT 0 3
+
+
+-- Genres
+
+INSERT INTO movie_db.genre (id, title_id, genre) VALUES
+
+  ('aaaa1111-0000-0000-0000-000000000001'::uuid, '11111111-1111-1111-1111-111111111111'::uuid, 'Action'),
+
+  ('aaaa1111-0000-0000-0000-000000000002'::uuid, '22222222-2222-2222-2222-222222222222'::uuid, 'Action'),
+
+  ('aaaa1111-0000-0000-0000-000000000003'::uuid, '33333333-3333-3333-3333-333333333333'::uuid, 'Romance');
+
+INSERT 0 3
+
+
+-- Persons
+
+INSERT INTO movie_db.person (id, legacy_id, primary_name) VALUES
+
+  ('44444444-4444-4444-4444-444444444444'::uuid, 'pseed1', 'Actor A'),
+
+  ('55555555-5555-5555-5555-555555555555'::uuid, 'pseed2', 'Actor B'),
+
+  ('66666666-6666-6666-6666-666666666666'::uuid, 'pseed3', 'Actor C');
+
+INSERT 0 3
+
+
+-- Actors (roles)
+
+INSERT INTO movie_db.actor (id, title_id, person_id, character_name) VALUES
+
+  ('aaaa2222-0000-0000-0000-000000000001'::uuid, '11111111-1111-1111-1111-111111111111'::uuid, '44444444-4444-4444-4444-444444444444'::uuid, 'Hero'),
+
+  ('aaaa2222-0000-0000-0000-000000000002'::uuid, '11111111-1111-1111-1111-111111111111'::uuid, '55555555-5555-5555-5555-555555555555'::uuid, 'Sidekick'),
+
+  ('aaaa2222-0000-0000-0000-000000000003'::uuid, '22222222-2222-2222-2222-222222222222'::uuid, '55555555-5555-5555-5555-555555555555'::uuid, 'Villain'),
+
+  ('aaaa2222-0000-0000-0000-000000000004'::uuid, '22222222-2222-2222-2222-222222222222'::uuid, '66666666-6666-6666-6666-666666666666'::uuid, 'Victim');
+
+INSERT 0 4
+
+
+-- Word index
+
+INSERT INTO movie_db.word_index (id, legacy_id, title_id, word, field) VALUES
+
+  ('aaaa3333-0000-0000-0000-000000000001'::uuid, 'w1', '11111111-1111-1111-1111-111111111111'::uuid, 'hero', 'p'),
+
+  ('aaaa3333-0000-0000-0000-000000000002'::uuid, 'w2', '22222222-2222-2222-2222-222222222222'::uuid, 'villain', 'p');
+
+INSERT 0 2
+
+
+-- ============================================
+
+-- Function Tests
+
+-- ============================================
+
+
+
+-- 1. rate_title
+
+SELECT *
+
+FROM api.add_user_title_rating(
+
+  '77777777-7777-7777-7777-777777777777',
+
+  '11111111-1111-1111-1111-111111111111',
+
+  8
+
+);
+
+psql:tests/movie-db-tests.sql:50: ERROR:  structure of query does not match function result type
+DETAIL:  Returned type integer does not match expected type bigint in column 3.
+CONTEXT:  SQL statement "INSERT INTO movie_db.rating (title_id, average_rating, num_votes)
+
+  SELECT ur.title_id, AVG(ur.rating)::DOUBLE PRECISION, COUNT(*)::BIGINT
+
+  FROM movie_db.user_rating ur
+
+  WHERE ur.title_id = p_title_id
+
+  GROUP BY ur.title_id
+
+  ON CONFLICT (title_id) DO UPDATE
+
+    SET average_rating = EXCLUDED.average_rating,
+
+        num_votes      = EXCLUDED.num_votes
+
+  RETURNING rating.title_id, rating.average_rating, rating.num_votes"
+PL/pgSQL function api.add_user_title_rating(uuid,uuid,integer) line 12 at RETURN QUERY
