@@ -1,3 +1,5 @@
+CREATE TYPE bookmark_target AS ENUM ('title', 'person');
+
 -- ============================================
 -- STEP 1: DROP EXISTING OBJECTS (for repeatability)
 -- ============================================
@@ -18,6 +20,7 @@ DROP PROCEDURE IF EXISTS api.delete_account(UUID) CASCADE;
 DROP TABLE IF EXISTS profile.rating_history CASCADE;
 DROP TABLE IF EXISTS profile.search_history CASCADE;
 DROP TABLE IF EXISTS profile.bookmark CASCADE;
+DROP TABLE IF EXISTS profile.notes CASCADE;
 DROP TABLE IF EXISTS profile.account CASCADE;
 
 -- ============================================
@@ -32,22 +35,14 @@ CREATE TABLE profile.account (
     created_at TIMESTAMP DEFAULT now()
 );
 
-CREATE TABLE profile.bookmark_title (
+CREATE TABLE profile.bookmark (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     account_id UUID NOT NULL REFERENCES profile.account(id) ON DELETE CASCADE,
-    title_id UUID NOT NULL,
-    note TEXT,
+    target_id UUID NOT NULL,
+    target_type bookmark_target NOT NULL,
+    note JSONB,
     added_at TIMESTAMP DEFAULT now(),
-    UNIQUE (account_id, title_id)
-);
-
-CREATE TABLE profile.bookmark_person (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    account_id UUID NOT NULL REFERENCES profile.account(id) ON DELETE CASCADE,
-    person_id UUID NOT NULL,
-    note TEXT,
-    added_at TIMESTAMP DEFAULT now(),
-    UNIQUE (account_id, person_id)
+    UNIQUE (account_id, target_id, target_type)
 );
 
 CREATE TABLE profile.search_history (
@@ -152,71 +147,76 @@ $$ LANGUAGE plpgsql;
 -- BOOKMARKS
 -- =========================================================
 
-CREATE TYPE bookmark_target AS ENUM ('all', 'title', 'person');
-
 CREATE OR REPLACE FUNCTION api.add_bookmark(
     p_account_id UUID,
     p_target_id UUID,
-    p_type bookmark_target DEFAULT 'title',
-    p_note TEXT DEFAULT NULL
+    p_type bookmark_target DEFAULT NULL
 ) RETURNS VOID AS $$
 BEGIN
-    IF p_type = 'title' THEN
-        INSERT INTO profile.bookmark_title (account_id, title_id, note)
-        VALUES (p_account_id, p_target_id, p_note)
-        ON CONFLICT (account_id, title_id)
-        DO UPDATE SET note = EXCLUDED.note, added_at = now();
+    IF p_type IS NULL THEN
+        RAISE EXCEPTION 
+          'You must provide a valid bookmark target type (title or person). Options: %', 
+          enum_range(NULL::bookmark_target);
+    END IF;
 
-    ELSIF p_type = 'person' THEN
-        INSERT INTO profile.bookmark_person (account_id, person_id, note)
-        VALUES (p_account_id, p_target_id, p_note)
-        ON CONFLICT (account_id, person_id)
-        DO UPDATE SET note = EXCLUDED.note, added_at = now();
+    INSERT INTO profile.bookmark (account_id, target_id, target_type)
+    VALUES (p_account_id, p_target_id, p_type)
+    ON CONFLICT (account_id, target_id, target_type) DO NOTHING;
+
+    IF NOT FOUND THEN
+        RAISE NOTICE 'Bookmark already exists for account %, target % (%). Use api.update_bookmark_note instead.', 
+                     p_account_id, p_target_id, p_type;
     END IF;
 END;
 $$ LANGUAGE plpgsql;
 
+CREATE OR REPLACE FUNCTION api.update_bookmark_note(
+    p_account_id UUID,
+    p_target_id UUID,
+    p_type bookmark_target,
+    p_note JSONB DEFAULT NULL
+) RETURNS VOID AS $$
+BEGIN
+    UPDATE profile.bookmark
+    SET note = p_note
+    WHERE account_id = p_account_id
+      AND target_id = p_target_id
+      AND target_type = p_type;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'No existing bookmark found for account %, target % (%).', 
+                        p_account_id, p_target_id, p_type;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Main function with optional filters
 CREATE OR REPLACE FUNCTION api.get_bookmarks(
     p_account_id UUID,
-    e_type bookmark_target DEFAULT 'all',
+    p_type bookmark_target DEFAULT NULL, -- NULL = get-all
     p_limit INT DEFAULT 50,
     p_offset INT DEFAULT 0
 ) RETURNS TABLE(
     target_id UUID,
-    target_type TEXT,
-    note TEXT,
+    target_type bookmark_target,
+    note JSONB,
     added_at TIMESTAMP
 ) AS $$
 BEGIN
-    IF e_type = 'title' THEN
+    IF p_type IS NULL THEN
         RETURN QUERY
-        SELECT b.title_id, 'title'::TEXT, b.note, b.added_at
-        FROM profile.bookmark_title b
+        SELECT b.target_id, b.target_type, b.note, b.added_at
+        FROM profile.bookmark b
         WHERE b.account_id = p_account_id
         ORDER BY b.added_at DESC
         LIMIT p_limit OFFSET p_offset;
-
-    ELSIF e_type = 'person' THEN
+    ELSE
         RETURN QUERY
-        SELECT b.person_id, 'person'::TEXT, b.note, b.added_at
-        FROM profile.bookmark_person b
+        SELECT b.target_id, b.target_type, b.note, b.added_at
+        FROM profile.bookmark b
         WHERE b.account_id = p_account_id
+          AND b.target_type = p_type
         ORDER BY b.added_at DESC
-        LIMIT p_limit OFFSET p_offset;
-
-    ELSE -- e_type = 'all'
-        RETURN QUERY
-        SELECT b.title_id, 'title'::TEXT, b.note, b.added_at
-        FROM profile.bookmark_title b
-        WHERE b.account_id = p_account_id
-
-        UNION ALL
-
-        SELECT b.person_id, 'person'::TEXT, b.note, b.added_at
-        FROM profile.bookmark_person b
-        WHERE b.account_id = p_account_id
-
-        ORDER BY added_at DESC
         LIMIT p_limit OFFSET p_offset;
     END IF;
 END;
@@ -258,7 +258,7 @@ $$ LANGUAGE plpgsql;
 
 
 -- =========================================================
--- RATINGS (already fixed before)
+-- RATINGS
 -- =========================================================
 
 CREATE OR REPLACE FUNCTION api.add_rating(

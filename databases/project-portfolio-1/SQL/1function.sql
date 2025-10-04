@@ -97,6 +97,7 @@ LANGUAGE sql AS $$
 $$;
 
 
+-- (TIM) I have just added these under the booksmarks instead having them this normalized, notes is not that common an interaction
 -- ===========================
 -- 1.3 Notes (tilføjer små note-tabeller + CRUD)
 -- ===========================

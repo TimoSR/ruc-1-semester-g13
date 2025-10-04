@@ -159,11 +159,11 @@ ON CONFLICT DO NOTHING;
 -- ============================================
 -- STEP 5: DROP SOURCE TABLES
 -- ============================================
-DROP TABLE IF EXISTS profile.title_akas CASCADE;
-DROP TABLE IF EXISTS profile.title_basics CASCADE;
-DROP TABLE IF EXISTS profile.title_crew CASCADE;
-DROP TABLE IF EXISTS profile.title_episode CASCADE;
-DROP TABLE IF EXISTS profile.title_principals CASCADE;
-DROP TABLE IF EXISTS profile.title_ratings CASCADE;
-DROP TABLE IF EXISTS profile.name_basics CASCADE;
-DROP TABLE IF EXISTS profile.omdb_data CASCADE;
+DROP TABLE IF EXISTS public.title_akas CASCADE;
+DROP TABLE IF EXISTS public.title_basics CASCADE;
+DROP TABLE IF EXISTS public.title_crew CASCADE;
+DROP TABLE IF EXISTS public.title_episode CASCADE;
+DROP TABLE IF EXISTS public.title_principals CASCADE;
+DROP TABLE IF EXISTS public.title_ratings CASCADE;
+DROP TABLE IF EXISTS public.name_basics CASCADE;
+DROP TABLE IF EXISTS public.omdb_data CASCADE;

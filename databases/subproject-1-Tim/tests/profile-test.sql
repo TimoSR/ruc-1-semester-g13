@@ -51,37 +51,77 @@ SELECT * FROM api.get_accounts(2, 2);
 SELECT api.add_bookmark(
   '11111111-1111-1111-1111-111111111111'::uuid, -- account_id
   '11111111-2222-3333-4444-555555555555'::uuid, -- title_id
-  'title'::bookmark_target,
-  'Great movie'::text
-);
-
--- Update the same title bookmark (UPSERT behaviour)
-SELECT api.add_bookmark(
-  '11111111-1111-1111-1111-111111111111'::uuid,
-  '11111111-2222-3333-4444-555555555555'::uuid,
-  'title'::bookmark_target,
-  'Changed my mind'::text
+  'title'::bookmark_target
 );
 
 -- Add another title bookmark
 SELECT api.add_bookmark(
   '11111111-1111-1111-1111-111111111111'::uuid,
   '66666666-7777-8888-9999-000000000000'::uuid,
-  'title'::bookmark_target,
-  'Also good'::text
+  'title'::bookmark_target
+);
+
+-- Try adding the same bookmark again (should raise NOTICE, not duplicate)
+SELECT api.add_bookmark(
+  '11111111-1111-1111-1111-111111111111'::uuid,
+  '11111111-2222-3333-4444-555555555555'::uuid,
+  'title'::bookmark_target
 );
 
 -- Add a person bookmark
 SELECT api.add_bookmark(
   '11111111-1111-1111-1111-111111111111'::uuid,
   'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'::uuid,
-  'person'::bookmark_target,
-  'One of my favourite actors'::text
+  'person'::bookmark_target
 );
 
--- Get bookmarks (examples)
+-- Update the note on the first title bookmark
+SELECT api.update_bookmark_note(
+  '11111111-1111-1111-1111-111111111111'::uuid,
+  '11111111-2222-3333-4444-555555555555'::uuid,
+  'title'::bookmark_target,
+  '{"text": "Changed my mind"}'
+);
+
+-- Update the note on the person bookmark
+SELECT api.update_bookmark_note(
+  '11111111-1111-1111-1111-111111111111'::uuid,
+  'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'::uuid,
+  'person'::bookmark_target,
+  '{"text": "Favourite actor"}'
+);
+
+-- Remove note from title bookmark (set back to NULL)
+SELECT api.update_bookmark_note(
+  '11111111-1111-1111-1111-111111111111'::uuid,
+  '11111111-2222-3333-4444-555555555555'::uuid,
+  'title'::bookmark_target,
+  NULL
+);
+
+-- Try updating a non-existing bookmark (should raise EXCEPTION)
+DO $$
+BEGIN
+    BEGIN
+        PERFORM api.update_bookmark_note(
+          '11111111-1111-1111-1111-111111111111'::uuid,
+          '99999999-aaaa-bbbb-cccc-111111111111'::uuid,
+          'title'::bookmark_target,
+          '{"text": "This should fail"}'
+        );
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'Expected error updating non-existent bookmark: %', SQLERRM;
+    END;
+END;
+$$;
+
+-- Get all bookmarks for Alice
 SELECT * FROM api.get_bookmarks('11111111-1111-1111-1111-111111111111'::uuid);
+
+-- Get only title bookmarks
 SELECT * FROM api.get_bookmarks('11111111-1111-1111-1111-111111111111'::uuid, 'title'::bookmark_target);
+
+-- Get only person bookmarks
 SELECT * FROM api.get_bookmarks('11111111-1111-1111-1111-111111111111'::uuid, 'person'::bookmark_target);
 
 -- ============================================

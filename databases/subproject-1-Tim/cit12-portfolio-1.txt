@@ -49,9 +49,9 @@ CALL
 
 CALL api.delete_account('22222222-2222-2222-2222-222222222222');
 
-psql:tests/profile-test.sql:17: NOTICE:  Created account with id 5fb4e32e-047f-4072-86e6-4c1dc42cc1c1
-psql:tests/profile-test.sql:20: NOTICE:  Deleted account 22222222-2222-2222-2222-222222222222
+psql:tests/profile-test.sql:17: NOTICE:  Created account with id f2c5de6a-927c-4dfb-8018-96fda256b059
 CALL
+psql:tests/profile-test.sql:20: NOTICE:  Deleted account 22222222-2222-2222-2222-222222222222
 
 
 -- Attempt to delete a non-existing account (should raise exception)
@@ -92,8 +92,8 @@ SELECT * FROM api.get_all_accounts;
 
                   id                  |        email        | username |         created_at         
 --------------------------------------+---------------------+----------+----------------------------
- 11111111-1111-1111-1111-111111111111 | alice@example.com   | alice    | 2025-10-04 07:39:19.385351
- 5fb4e32e-047f-4072-86e6-4c1dc42cc1c1 | charlie@example.com | charlie  | 2025-10-04 07:39:19.385351
+ 11111111-1111-1111-1111-111111111111 | alice@example.com   | alice    | 2025-10-04 08:49:55.962354
+ f2c5de6a-927c-4dfb-8018-96fda256b059 | charlie@example.com | charlie  | 2025-10-04 08:49:55.962354
 (2 rows)
 
 
@@ -104,8 +104,8 @@ SELECT * FROM api.get_accounts(2, 0);
 
                   id                  |        email        | username |         created_at         
 --------------------------------------+---------------------+----------+----------------------------
- 11111111-1111-1111-1111-111111111111 | alice@example.com   | alice    | 2025-10-04 07:39:19.385351
- 5fb4e32e-047f-4072-86e6-4c1dc42cc1c1 | charlie@example.com | charlie  | 2025-10-04 07:39:19.385351
+ 11111111-1111-1111-1111-111111111111 | alice@example.com   | alice    | 2025-10-04 08:49:55.962354
+ f2c5de6a-927c-4dfb-8018-96fda256b059 | charlie@example.com | charlie  | 2025-10-04 08:49:55.962354
 (2 rows)
 
 
@@ -136,30 +136,7 @@ SELECT api.add_bookmark(
 
   '11111111-2222-3333-4444-555555555555'::uuid, -- title_id
 
-  'title'::bookmark_target,
-
-  'Great movie'::text
-
-);
-
- add_bookmark 
---------------
- 
-(1 row)
-
-
-
--- Update the same title bookmark (UPSERT behaviour)
-
-SELECT api.add_bookmark(
-
-  '11111111-1111-1111-1111-111111111111'::uuid,
-
-  '11111111-2222-3333-4444-555555555555'::uuid,
-
-  'title'::bookmark_target,
-
-  'Changed my mind'::text
+  'title'::bookmark_target
 
 );
 
@@ -178,12 +155,30 @@ SELECT api.add_bookmark(
 
   '66666666-7777-8888-9999-000000000000'::uuid,
 
-  'title'::bookmark_target,
-
-  'Also good'::text
+  'title'::bookmark_target
 
 );
 
+ add_bookmark 
+--------------
+ 
+(1 row)
+
+
+
+-- Try adding the same bookmark again (should raise NOTICE, not duplicate)
+
+SELECT api.add_bookmark(
+
+  '11111111-1111-1111-1111-111111111111'::uuid,
+
+  '11111111-2222-3333-4444-555555555555'::uuid,
+
+  'title'::bookmark_target
+
+);
+
+psql:tests/profile-test.sql:69: NOTICE:  Bookmark already exists for account 11111111-1111-1111-1111-111111111111, target 11111111-2222-3333-4444-555555555555 (title). Use api.update_bookmark_note instead.
  add_bookmark 
 --------------
  
@@ -199,9 +194,7 @@ SELECT api.add_bookmark(
 
   'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'::uuid,
 
-  'person'::bookmark_target,
-
-  'One of my favourite actors'::text
+  'person'::bookmark_target
 
 );
 
@@ -212,30 +205,135 @@ SELECT api.add_bookmark(
 
 
 
--- Get bookmarks (examples)
+-- Update the note on the first title bookmark
+
+SELECT api.update_bookmark_note(
+
+  '11111111-1111-1111-1111-111111111111'::uuid,
+
+  '11111111-2222-3333-4444-555555555555'::uuid,
+
+  'title'::bookmark_target,
+
+  '{"text": "Changed my mind"}'
+
+);
+
+ update_bookmark_note 
+----------------------
+ 
+(1 row)
+
+
+
+-- Update the note on the person bookmark
+
+SELECT api.update_bookmark_note(
+
+  '11111111-1111-1111-1111-111111111111'::uuid,
+
+  'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'::uuid,
+
+  'person'::bookmark_target,
+
+  '{"text": "Favourite actor"}'
+
+);
+
+ update_bookmark_note 
+----------------------
+ 
+(1 row)
+
+
+
+-- Remove note from title bookmark (set back to NULL)
+
+SELECT api.update_bookmark_note(
+
+  '11111111-1111-1111-1111-111111111111'::uuid,
+
+  '11111111-2222-3333-4444-555555555555'::uuid,
+
+  'title'::bookmark_target,
+
+  NULL
+
+);
+
+ update_bookmark_note 
+----------------------
+ 
+(1 row)
+
+
+
+-- Try updating a non-existing bookmark (should raise EXCEPTION)
+
+DO $$
+
+BEGIN
+
+    BEGIN
+
+        PERFORM api.update_bookmark_note(
+
+          '11111111-1111-1111-1111-111111111111'::uuid,
+
+          '99999999-aaaa-bbbb-cccc-111111111111'::uuid,
+
+          'title'::bookmark_target,
+
+          '{"text": "This should fail"}'
+
+        );
+
+    EXCEPTION WHEN OTHERS THEN
+
+        RAISE NOTICE 'Expected error updating non-existent bookmark: %', SQLERRM;
+
+    END;
+
+END;
+
+$$;
+
+DO
+psql:tests/profile-test.sql:116: NOTICE:  Expected error updating non-existent bookmark: No existing bookmark found for account 11111111-1111-1111-1111-111111111111, target 99999999-aaaa-bbbb-cccc-111111111111 (title).
+
+
+-- Get all bookmarks for Alice
 
 SELECT * FROM api.get_bookmarks('11111111-1111-1111-1111-111111111111'::uuid);
 
-              target_id               | target_type |            note            |          added_at          
---------------------------------------+-------------+----------------------------+----------------------------
- 11111111-2222-3333-4444-555555555555 | title       | Changed my mind            | 2025-10-04 07:39:19.385351
- 66666666-7777-8888-9999-000000000000 | title       | Also good                  | 2025-10-04 07:39:19.385351
- aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee | person      | One of my favourite actors | 2025-10-04 07:39:19.385351
+              target_id               | target_type |            note             |          added_at          
+--------------------------------------+-------------+-----------------------------+----------------------------
+ 11111111-2222-3333-4444-555555555555 | title       |                             | 2025-10-04 08:49:55.962354
+ 66666666-7777-8888-9999-000000000000 | title       |                             | 2025-10-04 08:49:55.962354
+ aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee | person      | {"text": "Favourite actor"} | 2025-10-04 08:49:55.962354
 (3 rows)
+
+
+
+-- Get only title bookmarks
 
 SELECT * FROM api.get_bookmarks('11111111-1111-1111-1111-111111111111'::uuid, 'title'::bookmark_target);
 
-              target_id               | target_type |      note       |          added_at          
---------------------------------------+-------------+-----------------+----------------------------
- 11111111-2222-3333-4444-555555555555 | title       | Changed my mind | 2025-10-04 07:39:19.385351
- 66666666-7777-8888-9999-000000000000 | title       | Also good       | 2025-10-04 07:39:19.385351
+              target_id               | target_type | note |          added_at          
+--------------------------------------+-------------+------+----------------------------
+ 11111111-2222-3333-4444-555555555555 | title       |      | 2025-10-04 08:49:55.962354
+ 66666666-7777-8888-9999-000000000000 | title       |      | 2025-10-04 08:49:55.962354
 (2 rows)
+
+
+
+-- Get only person bookmarks
 
 SELECT * FROM api.get_bookmarks('11111111-1111-1111-1111-111111111111'::uuid, 'person'::bookmark_target);
 
-              target_id               | target_type |            note            |          added_at          
---------------------------------------+-------------+----------------------------+----------------------------
- aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee | person      | One of my favourite actors | 2025-10-04 07:39:19.385351
+              target_id               | target_type |            note             |          added_at          
+--------------------------------------+-------------+-----------------------------+----------------------------
+ aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee | person      | {"text": "Favourite actor"} | 2025-10-04 08:49:55.962354
 (1 row)
 
 
@@ -270,8 +368,8 @@ SELECT * FROM api.get_search_history('11111111-1111-1111-1111-111111111111'::uui
 
     query     |        searched_at         
 --------------+----------------------------
- matrix       | 2025-10-04 07:39:19.385351
- harry potter | 2025-10-04 07:39:19.385351
+ matrix       | 2025-10-04 08:49:55.962354
+ harry potter | 2025-10-04 08:49:55.962354
 (2 rows)
 
 
@@ -361,8 +459,8 @@ SELECT * FROM api.get_ratings_by_account_id(
 
                title_id               | rating |   comment   |         created_at         
 --------------------------------------+--------+-------------+----------------------------
- 22222222-3333-4444-5555-666666666666 |      9 | Even better | 2025-10-04 07:39:19.385351
- 77777777-8888-9999-0000-aaaaaaaaaaaa |      5 | Meh         | 2025-10-04 07:39:19.385351
+ 22222222-3333-4444-5555-666666666666 |      9 | Even better | 2025-10-04 08:49:55.962354
+ 77777777-8888-9999-0000-aaaaaaaaaaaa |      5 | Meh         | 2025-10-04 08:49:55.962354
 (2 rows)
 
 
