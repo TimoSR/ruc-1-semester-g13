@@ -36,14 +36,10 @@ alias f02 := f02-show-all-env
 f02-show-all-env:
 	Get-ChildItem Env:
 
-alias f00 := running-backup
-running-backup:
-	psql ${env:DB_URL_ADMIN} -f ./backups/imdb.backup
-
-alias f1 := f1-createDB-with-drop
+alias f1 := f1-run-full-pipeline-with-drop
 # Only works with dotenv-filename = .env.local
 [doc]
-f1-createDB-with-drop:
+f1-run-full-pipeline-with-drop:
 	Write-Output "============================================================"
 	Write-Output "🗑️  Dropping database: ${env:DB_NAME} (if it exists)..."
 	Write-Output "============================================================"
@@ -116,6 +112,3 @@ f3-createDB-no-drop:
 	Write-Output "============================================================"
 	Write-Output "✅ Database ${env:DB_NAME} is ready 🚀"
 	Write-Output "============================================================"
-
-alias f4 := f4-run-full-pipeline-with-drop
-f4-run-full-pipeline-with-drop: f1-createDB-with-drop f2-run-db-tests
