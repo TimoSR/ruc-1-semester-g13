@@ -124,37 +124,39 @@ CREATE TABLE movie_db.word_index (
 -- ============================================
 
 CREATE OR REPLACE FUNCTION api.add_user_title_rating(
-    p_account_id UUID,
-    p_title_id   UUID,
-    p_rate       INT
+    in_account_id UUID,
+    in_title_id   UUID,
+    in_rate       INT
 )
 RETURNS TABLE (
     out_title_id UUID,
-    out_average_rating DOUBLE PRECISION,
-    out_num_votes BIGINT
+    average_rating DOUBLE PRECISION,
+    num_votes INT
 )
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  -- Store or update the individual vote
-  IF p_account_id IS NOT NULL THEN
+  -- Store or update the individual vote if we have an account
+  IF in_account_id IS NOT NULL THEN
     INSERT INTO movie_db.user_rating (account_id, title_id, rating)
-    VALUES (p_account_id, p_title_id, p_rate)
+    VALUES (in_account_id, in_title_id, in_rate)
     ON CONFLICT (account_id, title_id)
     DO UPDATE SET rating = EXCLUDED.rating;
   END IF;
 
-  -- Recalculate/update the aggregate
+  -- Recalculate/update the aggregate rating
   RETURN QUERY
   INSERT INTO movie_db.rating (title_id, average_rating, num_votes)
-  SELECT ur.title_id, AVG(ur.rating)::DOUBLE PRECISION, COUNT(*)::BIGINT
+  SELECT ur.title_id, AVG(ur.rating)::DOUBLE PRECISION, COUNT(*)::INT
   FROM movie_db.user_rating ur
-  WHERE ur.title_id = p_title_id
+  WHERE ur.title_id = in_title_id
   GROUP BY ur.title_id
   ON CONFLICT (title_id) DO UPDATE
     SET average_rating = EXCLUDED.average_rating,
         num_votes      = EXCLUDED.num_votes
-  RETURNING rating.title_id, rating.average_rating, rating.num_votes;
+  RETURNING rating.title_id AS out_title_id, 
+            rating.average_rating, 
+            rating.num_votes;
 END;
 $$;
 
@@ -176,7 +178,7 @@ CREATE OR REPLACE FUNCTION api.get_coplayers(p_actor_name TEXT)
 RETURNS TABLE (
     person_id UUID,
     primary_name TEXT,
-    frequency BIGINT  -- changed to BIGINT
+    frequency BIGINT
 )
 LANGUAGE plpgsql 
 AS $$

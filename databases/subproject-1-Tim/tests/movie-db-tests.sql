@@ -41,20 +41,26 @@ INSERT INTO movie_db.word_index (id, legacy_id, title_id, word, field) VALUES
 -- Function Tests
 -- ============================================
 
--- 1. rate_title
+-- First rating
 SELECT *
 FROM api.add_user_title_rating(
-  '77777777-7777-7777-7777-777777777777',
-  '11111111-1111-1111-1111-111111111111',
-  8
+  '77777777-7777-7777-7777-777777777777'::uuid,  -- account 1
+  '11111111-1111-1111-1111-111111111111'::uuid,  -- title
+  8                                              -- rating
 );
 
+-- Second rating
 SELECT *
 FROM api.add_user_title_rating(
-  '88888888-8888-8888-8888-888888888888',
-  '11111111-1111-1111-1111-111111111111',
-  6
+  '88888888-8888-8888-8888-888888888888'::uuid,  -- account 2
+  '11111111-1111-1111-1111-111111111111'::uuid,  -- same title
+  6                                              -- rating
 );
+
+-- ✅ Expect: average_rating ≈ 7.0, num_votes = 2
+SELECT *
+FROM movie_db.rating
+WHERE title_id = '11111111-1111-1111-1111-111111111111'::uuid;
 
 -- Expect: average_rating ≈ 7.0, num_votes = 2
 TABLE movie_db.rating;
