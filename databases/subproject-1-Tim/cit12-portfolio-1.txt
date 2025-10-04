@@ -49,9 +49,9 @@ CALL
 
 CALL api.delete_account('22222222-2222-2222-2222-222222222222');
 
-psql:tests/profile-test.sql:17: NOTICE:  Created account with id 407b0b8e-ac2d-4e8e-be79-9a245a98a397
-CALL
+psql:tests/profile-test.sql:17: NOTICE:  Created account with id fc0b0ed5-8ad2-4c55-8c48-8f225bd344a0
 psql:tests/profile-test.sql:20: NOTICE:  Deleted account 22222222-2222-2222-2222-222222222222
+CALL
 
 
 -- Attempt to delete a non-existing account (should raise exception)
@@ -90,10 +90,10 @@ DO
 
 SELECT * FROM api.get_all_accounts;
 
-                  id                  |        email        | username |         created_at         
---------------------------------------+---------------------+----------+----------------------------
- 11111111-1111-1111-1111-111111111111 | alice@example.com   | alice    | 2025-10-04 14:39:11.154917
- 407b0b8e-ac2d-4e8e-be79-9a245a98a397 | charlie@example.com | charlie  | 2025-10-04 14:39:11.154917
+                  id                  |        email        | username |        created_at         
+--------------------------------------+---------------------+----------+---------------------------
+ 11111111-1111-1111-1111-111111111111 | alice@example.com   | alice    | 2025-10-04 14:56:53.70256
+ fc0b0ed5-8ad2-4c55-8c48-8f225bd344a0 | charlie@example.com | charlie  | 2025-10-04 14:56:53.70256
 (2 rows)
 
 
@@ -102,10 +102,10 @@ SELECT * FROM api.get_all_accounts;
 
 SELECT * FROM api.get_accounts(2, 0);
 
-                  id                  |        email        | username |         created_at         
---------------------------------------+---------------------+----------+----------------------------
- 11111111-1111-1111-1111-111111111111 | alice@example.com   | alice    | 2025-10-04 14:39:11.154917
- 407b0b8e-ac2d-4e8e-be79-9a245a98a397 | charlie@example.com | charlie  | 2025-10-04 14:39:11.154917
+                  id                  |        email        | username |        created_at         
+--------------------------------------+---------------------+----------+---------------------------
+ 11111111-1111-1111-1111-111111111111 | alice@example.com   | alice    | 2025-10-04 14:56:53.70256
+ fc0b0ed5-8ad2-4c55-8c48-8f225bd344a0 | charlie@example.com | charlie  | 2025-10-04 14:56:53.70256
 (2 rows)
 
 
@@ -298,19 +298,19 @@ END;
 
 $$;
 
-DO
 psql:tests/profile-test.sql:116: NOTICE:  Expected error updating non-existent bookmark: No existing bookmark found for account 11111111-1111-1111-1111-111111111111, target 99999999-aaaa-bbbb-cccc-111111111111 (title).
+DO
 
 
 -- Get all bookmarks for Alice
 
 SELECT * FROM api.get_bookmarks('11111111-1111-1111-1111-111111111111'::uuid);
 
-              target_id               | target_type |            note             |          added_at          
---------------------------------------+-------------+-----------------------------+----------------------------
- 11111111-2222-3333-4444-555555555555 | title       |                             | 2025-10-04 14:39:11.154917
- 66666666-7777-8888-9999-000000000000 | title       |                             | 2025-10-04 14:39:11.154917
- aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee | person      | {"text": "Favourite actor"} | 2025-10-04 14:39:11.154917
+              target_id               | target_type |            note             |         added_at          
+--------------------------------------+-------------+-----------------------------+---------------------------
+ 11111111-2222-3333-4444-555555555555 | title       |                             | 2025-10-04 14:56:53.70256
+ 66666666-7777-8888-9999-000000000000 | title       |                             | 2025-10-04 14:56:53.70256
+ aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee | person      | {"text": "Favourite actor"} | 2025-10-04 14:56:53.70256
 (3 rows)
 
 
@@ -319,10 +319,10 @@ SELECT * FROM api.get_bookmarks('11111111-1111-1111-1111-111111111111'::uuid);
 
 SELECT * FROM api.get_bookmarks('11111111-1111-1111-1111-111111111111'::uuid, 'title'::bookmark_target);
 
-              target_id               | target_type | note |          added_at          
---------------------------------------+-------------+------+----------------------------
- 11111111-2222-3333-4444-555555555555 | title       |      | 2025-10-04 14:39:11.154917
- 66666666-7777-8888-9999-000000000000 | title       |      | 2025-10-04 14:39:11.154917
+              target_id               | target_type | note |         added_at          
+--------------------------------------+-------------+------+---------------------------
+ 11111111-2222-3333-4444-555555555555 | title       |      | 2025-10-04 14:56:53.70256
+ 66666666-7777-8888-9999-000000000000 | title       |      | 2025-10-04 14:56:53.70256
 (2 rows)
 
 
@@ -331,9 +331,9 @@ SELECT * FROM api.get_bookmarks('11111111-1111-1111-1111-111111111111'::uuid, 't
 
 SELECT * FROM api.get_bookmarks('11111111-1111-1111-1111-111111111111'::uuid, 'person'::bookmark_target);
 
-              target_id               | target_type |            note             |          added_at          
---------------------------------------+-------------+-----------------------------+----------------------------
- aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee | person      | {"text": "Favourite actor"} | 2025-10-04 14:39:11.154917
+              target_id               | target_type |            note             |         added_at          
+--------------------------------------+-------------+-----------------------------+---------------------------
+ aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee | person      | {"text": "Favourite actor"} | 2025-10-04 14:56:53.70256
 (1 row)
 
 
@@ -366,10 +366,10 @@ SELECT api.add_search_to_history('11111111-1111-1111-1111-111111111111'::uuid, '
 
 SELECT * FROM api.get_search_history('11111111-1111-1111-1111-111111111111'::uuid, 5, 0);
 
-    query     |        searched_at         
---------------+----------------------------
- matrix       | 2025-10-04 14:39:11.154917
- harry potter | 2025-10-04 14:39:11.154917
+    query     |        searched_at        
+--------------+---------------------------
+ matrix       | 2025-10-04 14:56:53.70256
+ harry potter | 2025-10-04 14:56:53.70256
 (2 rows)
 
 
@@ -457,10 +457,10 @@ SELECT * FROM api.get_ratings_by_account_id(
 
 );
 
-               title_id               | rating |   comment   |         created_at         
---------------------------------------+--------+-------------+----------------------------
- 22222222-3333-4444-5555-666666666666 |      9 | Even better | 2025-10-04 14:39:11.154917
- 77777777-8888-9999-0000-aaaaaaaaaaaa |      5 | Meh         | 2025-10-04 14:39:11.154917
+               title_id               | rating |   comment   |        created_at         
+--------------------------------------+--------+-------------+---------------------------
+ 22222222-3333-4444-5555-666666666666 |      9 | Even better | 2025-10-04 14:56:53.70256
+ 77777777-8888-9999-0000-aaaaaaaaaaaa |      5 | Meh         | 2025-10-04 14:56:53.70256
 (2 rows)
 
 
@@ -846,6 +846,71 @@ SELECT * FROM api.word_to_words_query(ARRAY['hero'], 10);
 -- End of tests
 
 -- ============================================
+
+ROLLBACK;
+ROLLBACK
+\set ON_ERROR_STOP on
+
+
+
+BEGIN;
+
+BEGIN
+\i ./tests/moviedb-port-test.sql
+
+-- ============================================
+
+-- VERIFICATION QUERIES
+
+-- ============================================
+
+SELECT 'Titles migrated:' AS info, COUNT(*) AS count FROM movie_db.title;
+
+       info       | count  
+------------------+--------
+ Titles migrated: | 158999
+(1 row)
+
+SELECT 'Episodes migrated:' AS info, COUNT(*) AS count FROM movie_db.episode;
+
+        info        | count 
+--------------------+-------
+ Episodes migrated: | 92449
+(1 row)
+
+SELECT 'Genres migrated:' AS info, COUNT(*) AS count FROM movie_db.genre;
+
+       info       | count  
+------------------+--------
+ Genres migrated: | 281474
+(1 row)
+
+SELECT 'Ratings migrated:' AS info, COUNT(*) AS count FROM movie_db.rating;
+
+       info        | count 
+-------------------+-------
+ Ratings migrated: | 91255
+(1 row)
+
+SELECT 'Persons migrated:' AS info, COUNT(*) AS count FROM movie_db.person;
+
+       info        | count  
+-------------------+--------
+ Persons migrated: | 513987
+(1 row)
+
+SELECT 'Actors migrated:' AS info, COUNT(*) AS count FROM movie_db.actor;
+
+       info       | count  
+------------------+--------
+ Actors migrated: | 950135
+(1 row)
+
+SELECT 'Crew migrated:' AS info, COUNT(*) AS count FROM movie_db.crew;
+      info      | count  
+----------------+--------
+ Crew migrated: | 894754
+(1 row)
 
 ROLLBACK;
 ROLLBACK

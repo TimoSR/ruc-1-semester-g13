@@ -63,6 +63,26 @@ CREATE TABLE profile.rating_history (
 );
 
 -- ============================================
+-- Indexes
+-- ============================================
+
+CREATE INDEX idx_bookmark_account_type_added
+ON profile.bookmark (account_id, target_type, added_at DESC);
+
+CREATE INDEX idx_search_history_account_time
+ON profile.search_history (account_id, searched_at DESC);
+
+CREATE INDEX idx_search_history_query_trgm
+ON profile.search_history
+USING gin (search_query gin_trgm_ops);
+
+CREATE INDEX idx_rating_history_title
+ON profile.rating_history (title_id);
+
+CREATE INDEX idx_rating_history_account_time
+ON profile.rating_history (account_id, created_at DESC);
+
+-- ============================================
 -- FUNCTIONS (API schema)
 -- ============================================
 

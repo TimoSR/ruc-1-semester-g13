@@ -120,6 +120,85 @@ CREATE TABLE movie_db.word_index (
 );
 
 -- ============================================
+-- Indexes
+-- ============================================
+
+-- ============================================
+-- Indexes
+-- ============================================
+
+-- Title: search by primary_title, plot (ILIKE / substring search)
+CREATE INDEX idx_title_primary_title_trgm
+  ON movie_db.title USING gin (primary_title gin_trgm_ops);
+
+CREATE INDEX idx_title_plot_trgm
+  ON movie_db.title USING gin (plot gin_trgm_ops);
+
+-- Title: full-text index alternative (if you use full-text search instead of trigram)
+CREATE INDEX idx_title_fulltext
+  ON movie_db.title USING gin (to_tsvector('english', primary_title || ' ' || coalesce(plot,'')));
+
+-- User ratings: lookup by account
+CREATE INDEX idx_user_rating_account
+  ON movie_db.user_rating (account_id);
+
+-- Genre: join by title, filter by genre
+CREATE INDEX idx_genre_title
+  ON movie_db.genre (title_id);
+
+CREATE INDEX idx_genre_genre
+  ON movie_db.genre (genre);
+
+-- Episode: filter by parent_id, season/episode numbers
+CREATE INDEX idx_episode_parent
+  ON movie_db.episode (parent_id);
+
+CREATE INDEX idx_episode_season
+  ON movie_db.episode (season_number, episode_number);
+
+-- Also known as: join by title, search by aka title
+CREATE INDEX idx_aka_titleid
+  ON movie_db.also_known_as (title_id);
+
+CREATE INDEX idx_aka_title_trgm
+  ON movie_db.also_known_as USING gin (title gin_trgm_ops);
+
+-- Person: lookup by name (ILIKE)
+CREATE INDEX idx_person_name_trgm
+  ON movie_db.person USING gin (primary_name gin_trgm_ops);
+
+-- Person known for / profession
+CREATE INDEX idx_person_known_for_title
+  ON movie_db.person_known_for (title_id);
+
+CREATE INDEX idx_person_profession
+  ON movie_db.person_profession (profession);
+
+-- Actor / Crew: joins on title_id and person_id
+CREATE INDEX idx_actor_title
+  ON movie_db.actor (title_id);
+
+CREATE INDEX idx_actor_person
+  ON movie_db.actor (person_id);
+
+CREATE INDEX idx_crew_title
+  ON movie_db.crew (title_id);
+
+CREATE INDEX idx_crew_person
+  ON movie_db.crew (person_id);
+
+-- Word index: lookups by word, joins on title
+CREATE INDEX idx_word_index_word
+  ON movie_db.word_index (lower(word));
+
+CREATE INDEX idx_word_index_title
+  ON movie_db.word_index (title_id);
+
+-- Optional: trigram index if you do fuzzy searches on words
+CREATE INDEX idx_word_index_word_trgm
+  ON movie_db.word_index USING gin (word gin_trgm_ops);
+
+-- ============================================
 -- FUNCTIONS (API schema)
 -- ============================================
 
@@ -292,9 +371,16 @@ $$;
 -- ============================================
 
 
--- These had profile interaction which is bad practise
-------
 
+-- New solution Full-text (tsvector + GIN)
+-- Pros: understands lexemes, supports stemming, ranking, boolean operators.
+-- Cons: no arbitrary substring matching (“ero” won’t find “hero”).
+
+-- Old Solution
+-- Trigram (ILIKE with gin_trgm_ops)
+-- Pros: works like substring search.
+-- Cons: no stemming, no ranking.
+-- Example: %hero% matches “superhero”.
 CREATE OR REPLACE FUNCTION api.string_search_title(p_query TEXT)
 RETURNS TABLE (
     title_id UUID,
@@ -304,9 +390,12 @@ LANGUAGE sql
 AS $$
     SELECT t.id, t.primary_title
     FROM movie_db.title t
-    WHERE t.primary_title ILIKE '%' || p_query || '%'
-       OR t.plot          ILIKE '%' || p_query || '%'
-    ORDER BY t.primary_title;
+    WHERE to_tsvector('english', t.primary_title || ' ' || coalesce(t.plot, ''))
+          @@ plainto_tsquery('english', p_query)
+    ORDER BY ts_rank(
+              to_tsvector('english', t.primary_title || ' ' || coalesce(t.plot, '')),
+              plainto_tsquery('english', p_query)
+             ) DESC;
 $$;
 
 CREATE OR REPLACE FUNCTION api.structured_string_search(
